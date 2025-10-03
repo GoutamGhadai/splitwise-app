@@ -335,11 +335,25 @@
                 }
             };
 
+             const _performAddGuest = (name, message) => {
+                const newGuest = { id: generateId(), name };
+                const logMessage = message || `${name} was added to the trip.`;
+                modifyActiveTrip(trip => ({ ...trip, guests: [...trip.guests, newGuest] }), logMessage);
+            };
+
             // --- Handlers for Guests & Expenses (now operate on the active trip) ---
             const addGuest = (name) => {
                 if (name && activeTrip && !activeTrip.guests.some(g => g.name === name)) {
-                    const newGuest = { id: generateId(), name };
-                    modifyActiveTrip(trip => ({ ...trip, guests: [...trip.guests, newGuest] }), `${name} was added to the trip.`);
+                    const potentialExpensesToUpdate = activeTrip.expenses.filter(exp =>
+                        exp.splitType === 'equally' && exp.splitWith.length === activeTrip.guests.length
+                    );
+
+                    if (potentialExpensesToUpdate.length > 0) {
+                        setActionTargetId({ guestName: name, expensesToUpdate: potentialExpensesToUpdate });
+                        setConfirmAction('includeNewGuest');
+                    } else {
+                        _performAddGuest(name);
+                    }
                 }
             };
             
@@ -376,8 +390,33 @@
                 modifyActiveTrip(trip => ({...trip, expenses: trip.expenses.filter(exp => exp.id !== id), paidSettlements: {} }), message);
             };
 
+            const handleModalClose = () => {
+                if (confirmAction === 'includeNewGuest') {
+                    _performAddGuest(actionTargetId.guestName);
+                }
+                setConfirmAction(null);
+                setActionTargetId(null);
+            };
+
             const handleConfirm = () => {
-                if (confirmAction === 'removeAllGuests') {
+                if (confirmAction === 'includeNewGuest') {
+                    const { guestName, expensesToUpdate } = actionTargetId;
+                    const newGuest = { id: generateId(), name: guestName };
+                    const expenseIdsToUpdate = expensesToUpdate.map(exp => exp.id);
+                    const updater = trip => {
+                        const updatedGuests = [...trip.guests, newGuest];
+                        const updatedExpenses = trip.expenses.map(exp => {
+                            if (expenseIdsToUpdate.includes(exp.id)) {
+                                return { ...exp, splitWith: [...exp.splitWith, newGuest.id] };
+                            }
+                            return exp;
+                        });
+                        return { ...trip, guests: updatedGuests, expenses: updatedExpenses, paidSettlements: {} };
+                    };
+                    const message = `${guestName} was added and included in ${expensesToUpdate.length} past expense(s).`;
+                    modifyActiveTrip(updater, message);
+                }
+                else if (confirmAction === 'removeAllGuests') {
                     modifyActiveTrip(trip => ({ ...trip, guests: [], expenses: [], paidSettlements: {} }), 'All guests and expenses were removed.');
                 } else if (confirmAction === 'removeAllExpenses') {
                     modifyActiveTrip(trip => ({ ...trip, expenses: [], paidSettlements: {} }), 'All expenses were removed.');
@@ -473,6 +512,31 @@
                     .sort((a, b) => b.amount - a.amount);
 
             }, [activeTrip]);
+
+            let modalTitle = '';
+            let modalBody = null;
+            let modalConfirmText = '';
+            let modalCancelText = 'Cancel';
+
+            if (confirmAction === 'deleteTrip') {
+                modalTitle = 'Delete Trip?';
+                modalBody = <p>Are you sure? This action will permanently delete this trip and all its data. This cannot be undone.</p>;
+                modalConfirmText = 'Yes, Delete Trip';
+            } else if (confirmAction === 'removeAllGuests') {
+                modalTitle = "Remove All Guests?";
+                modalBody = <p>Are you sure? This will remove all guests and permanently delete all associated expenses.</p>;
+                modalConfirmText = "Yes, Remove All Guests";
+            } else if (confirmAction === 'removeAllExpenses') {
+                modalTitle = "Remove All Expenses?";
+                modalBody = <p>Are you sure? This will permanently delete all expenses for this trip.</p>;
+                modalConfirmText = "Yes, Remove All Expenses";
+            } else if (confirmAction === 'includeNewGuest') {
+                const { guestName, expensesToUpdate } = actionTargetId || {};
+                modalTitle = `Add ${guestName} to past expenses?`;
+                modalBody = <p>You have {expensesToUpdate?.length} expense(s) split equally among all members. Do you want to add <strong>{guestName}</strong> to them?</p>;
+                modalConfirmText = 'Yes, Add to All';
+                modalCancelText = "No, Don't Add";
+            }
             
             // --- Renders ---
             if (!activeTrip) {
@@ -491,8 +555,8 @@
                                     const tripGuestMap = trip.guests.reduce((map, guest) => ({...map, [guest.id]: guest.name}), {});
 
                                     return (
-                                        <div key={trip.id} className="bg-white rounded-xl shadow-md overflow-hidden transition-all duration-300">
-                                            <div className="p-4 flex justify-between items-center cursor-pointer hover:bg-slate-50" onClick={() => setExpandedTripId(prevId => prevId === trip.id ? null : trip.id)}>
+                                        <div key={trip.id} className="bg-white rounded-xl shadow-md overflow-hidden transition-all duration-300 transform hover:scale-[1.02] hover:shadow-xl">
+                                            <div className="p-4 flex justify-between items-center cursor-pointer" onClick={() => setExpandedTripId(prevId => prevId === trip.id ? null : trip.id)}>
                                                 <div>
                                                     <h2 className="font-bold text-xl text-left">{trip.name}</h2>
                                                     <p className="text-sm text-slate-500 text-left">
@@ -500,13 +564,13 @@
                                                     </p>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <button onClick={(e) => { e.stopPropagation(); handleEditTrip(trip); }} className="text-blue-500 hover:text-blue-700 p-2 rounded-full hover:bg-blue-100">
+                                                    <button onClick={(e) => { e.stopPropagation(); handleEditTrip(trip); }} className="text-blue-500 hover:text-blue-700 p-2 rounded-full hover:bg-blue-100 transition-colors">
                                                         <EditIcon />
                                                     </button>
-                                                    <button onClick={(e) => { e.stopPropagation(); setActionTargetId(trip.id); setConfirmAction('deleteTrip'); }} className="text-red-500 hover:text-red-700 p-2 rounded-full hover:bg-red-100">
+                                                    <button onClick={(e) => { e.stopPropagation(); setActionTargetId(trip.id); setConfirmAction('deleteTrip'); }} className="text-red-500 hover:text-red-700 p-2 rounded-full hover:bg-red-100 transition-colors">
                                                         <TrashIcon />
                                                     </button>
-                                                    <button onClick={(e) => { e.stopPropagation(); setActiveTripId(trip.id); }} className="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-lg">
+                                                    <button onClick={(e) => { e.stopPropagation(); setActiveTripId(trip.id); }} className="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
                                                         Open
                                                     </button>
                                                 </div>
@@ -560,15 +624,16 @@
                                 )}
                             </div>
                         </div>
-                        <TripModal isOpen={isTripModalOpen} onClose={() => { setTripModalOpen(false); setEditingTrip(null); }} onTripAction={handleTripAction} tripToEdit={editingTrip} />
+                        <TripModal isOpen={isTripModalOpen} onClose={() => setTripModalOpen(false)} onTripAction={handleTripAction} tripToEdit={editingTrip} />
                         <ConfirmationModal
-                            isOpen={confirmAction === 'deleteTrip'}
-                            onClose={() => { setConfirmAction(null); setActionTargetId(null); }}
+                            isOpen={!!confirmAction}
+                            onClose={handleModalClose}
                             onConfirm={handleConfirm}
-                            title="Delete Trip?"
-                            confirmButtonText="Yes, Delete Trip"
+                            title={modalTitle}
+                            confirmButtonText={modalConfirmText}
+                            cancelButtonText={modalCancelText}
                         >
-                            <p>Are you sure? This action will permanently delete this trip and all its data. This cannot be undone.</p>
+                            {modalBody}
                         </ConfirmationModal>
                     </div>
                 );
@@ -583,7 +648,7 @@
                         <header className="py-4 border-b-2 border-slate-200">
                             <div className="flex justify-between items-center">
                                  <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight flex items-center gap-4">
-                                   <button onClick={() => setActiveTripId(null)} className="p-2 rounded-full hover:bg-slate-200">
+                                   <button onClick={() => setActiveTripId(null)} className="p-2 rounded-full hover:bg-slate-200 transition-colors">
                                         <BackArrowIcon />
                                    </button>
                                     SplitWise
@@ -602,7 +667,7 @@
                                             Trip Guests
                                         </h2>
                                         {activeTrip.guests.length > 0 && (
-                                            <button onClick={() => setConfirmAction('removeAllGuests')} className="text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-100 font-semibold text-sm flex items-center gap-1">
+                                            <button onClick={() => setConfirmAction('removeAllGuests')} className="text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-100 font-semibold text-sm flex items-center gap-1 transition-colors">
                                                 <TrashIcon />
                                                 Remove All
                                             </button>
@@ -612,13 +677,13 @@
                                         {activeTrip.guests.length > 0 ? activeTrip.guests.map(guest => {
                                             const summary = guestSummaries[guest.id] || { paid: 0, share: 0 };
                                             return (
-                                                <li key={guest.id} className="bg-slate-50 p-3 rounded-lg">
+                                                <li key={guest.id} className="bg-slate-50 p-3 rounded-lg transition-shadow hover:shadow-md">
                                                     <div className="flex justify-between items-center">
                                                         <div className="flex items-center gap-3">
                                                             <Avatar name={guest.name} />
                                                             <span className="font-bold text-lg text-slate-800">{guest.name}</span>
                                                         </div>
-                                                        <button onClick={() => removeGuest(guest.id)} className="text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-100 flex-shrink-0">
+                                                        <button onClick={() => removeGuest(guest.id)} className="text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-100 flex-shrink-0 transition-colors">
                                                             <TrashIcon />
                                                         </button>
                                                     </div>
@@ -664,7 +729,7 @@
                                     <div className="flex justify-between items-center mb-4">
                                         <h2 className="text-xl font-semibold">Expenses</h2>
                                         {activeTrip.expenses.length > 0 && (
-                                            <button onClick={() => setConfirmAction('removeAllExpenses')} className="text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-100 font-semibold text-sm flex items-center gap-1">
+                                            <button onClick={() => setConfirmAction('removeAllExpenses')} className="text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-100 font-semibold text-sm flex items-center gap-1 transition-colors">
                                                 <TrashIcon />
                                                 Remove All
                                             </button>
@@ -672,7 +737,7 @@
                                     </div>
                                     <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
                                         {activeTrip.expenses.length > 0 ? activeTrip.expenses.map(expense => (
-                                            <div key={expense.id} className="bg-slate-50 p-4 rounded-lg flex items-start justify-between">
+                                            <div key={expense.id} className="bg-slate-50 p-4 rounded-lg flex items-start justify-between transition-shadow hover:shadow-md">
                                                 <div>
                                                     <div className="flex items-center gap-2">
                                                         <span 
@@ -691,10 +756,10 @@
                                                 <div className="text-right flex-shrink-0 ml-4">
                                                     <p className="text-xl font-bold text-green-600">₹{parseFloat(expense.amount).toFixed(2)}</p>
                                                      <div className="flex items-center justify-end gap-2 mt-1">
-                                                        <button onClick={() => handleOpenEditExpenseModal(expense.id)} className="text-blue-500 hover:text-blue-700 p-1 rounded-full hover:bg-blue-100">
+                                                        <button onClick={() => handleOpenEditExpenseModal(expense.id)} className="text-blue-500 hover:text-blue-700 p-1 rounded-full hover:bg-blue-100 transition-colors">
                                                             <EditIcon />
                                                         </button>
-                                                        <button onClick={() => removeExpense(expense.id)} className="text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-100">
+                                                        <button onClick={() => removeExpense(expense.id)} className="text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-100 transition-colors">
                                                             <TrashIcon />
                                                         </button>
                                                      </div>
@@ -773,14 +838,14 @@
                         expenseToEdit={activeTrip.expenses.find(exp => exp.id === editingExpenseId)}
                     />
                      <ConfirmationModal
-                        isOpen={!!confirmAction && (confirmAction === 'removeAllGuests' || confirmAction === 'removeAllExpenses')}
-                        onClose={() => setConfirmAction(null)}
+                        isOpen={!!confirmAction}
+                        onClose={handleModalClose}
                         onConfirm={handleConfirm}
-                        title={confirmAction === 'removeAllGuests' ? "Remove All Guests?" : "Remove All Expenses?"}
-                        confirmButtonText={confirmAction === 'removeAllGuests' ? "Yes, Remove All Guests" : "Yes, Remove All Expenses"}
+                        title={modalTitle}
+                        confirmButtonText={modalConfirmText}
+                        cancelButtonText={modalCancelText}
                     >
-                        {confirmAction === 'removeAllGuests' && <p>Are you sure? This will remove all guests and permanently delete all associated expenses.</p>}
-                        {confirmAction === 'removeAllExpenses' && <p>Are you sure? This will permanently delete all expenses for this trip.</p>}
+                        {modalBody}
                     </ConfirmationModal>
                 </div>
             );
@@ -837,31 +902,48 @@
         }
 
         function PieChart({ data }) {
-            const total = data.reduce((sum, item) => sum + item.amount, 0);
-            let cumulativePercent = 0;
+            const radius = 50;
+            const circumference = 2 * Math.PI * radius;
+            const [isMounted, setIsMounted] = useState(false);
+            useEffect(() => {
+                const timer = setTimeout(() => setIsMounted(true), 100);
+                return () => clearTimeout(timer);
+            }, []);
 
-            const getCoordinatesForPercent = (percent) => {
-                const x = Math.cos(2 * Math.PI * percent);
-                const y = Math.sin(2 * Math.PI * percent);
-                return [x, y];
-            };
+            let cumulativeAngle = 0;
 
             return (
-                <svg viewBox="-1 -1 2 2" className="w-40 h-40 flex-shrink-0">
-                    {data.map(item => {
-                        const percent = item.amount / total;
-                        const [startX, startY] = getCoordinatesForPercent(cumulativePercent);
-                        cumulativePercent += percent;
-                        const [endX, endY] = getCoordinatesForPercent(cumulativePercent);
-                        const largeArcFlag = percent > 0.5 ? 1 : 0;
-                        const pathData = [
-                            `M ${startX} ${startY}`,
-                            `A 1 1 0 ${largeArcFlag} 1 ${endX} ${endY}`,
-                            `L 0 0`
-                        ].join(' ');
+                <svg viewBox="0 0 120 120" className="w-40 h-40 flex-shrink-0">
+                    <g transform="rotate(-90 60 60)">
+                        {data.map(item => {
+                            const total = data.reduce((sum, i) => sum + i.amount, 0);
+                            if (total === 0) return null;
+                            const percent = item.amount / total;
+                            const dashArray = percent * circumference;
+                            
+                            const rotation = cumulativeAngle;
+                            cumulativeAngle += percent * 360;
 
-                        return <path key={item.name} d={pathData} fill={CATEGORY_COLORS[item.name]} />;
-                    })}
+                            return (
+                                <circle
+                                    key={item.name}
+                                    cx="60"
+                                    cy="60"
+                                    r={radius}
+                                    fill="transparent"
+                                    stroke={CATEGORY_COLORS[item.name]}
+                                    strokeWidth="20"
+                                    strokeDasharray={circumference}
+                                    strokeDashoffset={isMounted ? circumference - dashArray : circumference}
+                                    style={{ 
+                                        transform: `rotate(${rotation}deg)`, 
+                                        transformOrigin: '50% 50%', 
+                                        transition: 'stroke-dashoffset 0.8s cubic-bezier(0.5, 0, 0.5, 1)' 
+                                    }}
+                                />
+                            );
+                        })}
+                    </g>
                 </svg>
             );
         }
@@ -885,8 +967,9 @@
         function TripModal({ isOpen, onClose, onTripAction, tripToEdit }) {
             const [name, setName] = useState('');
             const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+            const [isAnimating, setIsAnimating] = useState(false);
 
-            useEffect(() => {
+             useEffect(() => {
                 if (isOpen) {
                     if (tripToEdit) {
                         setName(tripToEdit.name);
@@ -895,8 +978,16 @@
                         setName('');
                         setDate(new Date().toISOString().split('T')[0]);
                     }
+                    requestAnimationFrame(() => setIsAnimating(true));
+                } else {
+                    setIsAnimating(false);
                 }
             }, [isOpen, tripToEdit]);
+
+            const handleClose = () => {
+                setIsAnimating(false);
+                setTimeout(onClose, 300);
+            };
 
             const handleSubmit = (e) => {
                 e.preventDefault();
@@ -905,11 +996,17 @@
                 }
             };
             
-            if (!isOpen) return null;
+            if (!isOpen && !isAnimating) return null;
 
             return (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+                <div 
+                    className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-black transition-opacity duration-300 ${isAnimating ? 'bg-opacity-50' : 'bg-opacity-0'}`}
+                    onClick={handleClose}
+                >
+                    <div 
+                        className={`bg-white rounded-lg shadow-xl w-full max-w-md p-6 transform transition-all duration-300 ${isAnimating ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}
+                        onClick={e => e.stopPropagation()}
+                    >
                         <h2 className="text-2xl font-bold mb-4">{tripToEdit ? 'Edit Trip' : 'Start a New Trip'}</h2>
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div>
@@ -933,8 +1030,8 @@
                                 />
                             </div>
                             <div className="flex justify-end gap-4 mt-6">
-                                <button type="button" onClick={onClose} className="py-2 px-4 bg-slate-200 hover:bg-slate-300 rounded-md font-semibold">Cancel</button>
-                                <button type="submit" className="py-2 px-4 bg-blue-500 hover:bg-blue-600 text-white rounded-md font-semibold">{tripToEdit ? 'Save Changes' : 'Start Trip'}</button>
+                                <button type="button" onClick={handleClose} className="py-2 px-4 bg-slate-200 hover:bg-slate-300 rounded-md font-semibold transition-colors">Cancel</button>
+                                <button type="submit" className="py-2 px-4 bg-blue-500 hover:bg-blue-600 text-white rounded-md font-semibold transition-colors">{tripToEdit ? 'Save Changes' : 'Start Trip'}</button>
                             </div>
                         </form>
                     </div>
@@ -944,21 +1041,41 @@
 
         function GuestModal({ isOpen, onClose, onAddGuest }) {
             const [name, setName] = useState('');
+             const [isAnimating, setIsAnimating] = useState(false);
+
+            useEffect(() => {
+                if (isOpen) {
+                    setName('');
+                    requestAnimationFrame(() => setIsAnimating(true));
+                } else {
+                    setIsAnimating(false);
+                }
+            }, [isOpen]);
+
+            const handleClose = () => {
+                setIsAnimating(false);
+                setTimeout(onClose, 300);
+            };
 
             const handleSubmit = (e) => {
                 e.preventDefault();
                 if (name.trim()) {
                     onAddGuest(name.trim());
-                    setName('');
-                    onClose();
+                    handleClose();
                 }
             };
             
-            if (!isOpen) return null;
+            if (!isOpen && !isAnimating) return null;
 
             return (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+                <div 
+                    className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-black transition-opacity duration-300 ${isAnimating ? 'bg-opacity-50' : 'bg-opacity-0'}`}
+                    onClick={handleClose}
+                >
+                    <div 
+                        className={`bg-white rounded-lg shadow-xl w-full max-w-md p-6 transform transition-all duration-300 ${isAnimating ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}
+                        onClick={e => e.stopPropagation()}
+                    >
                         <h2 className="text-2xl font-bold mb-4">Add a New Guest</h2>
                         <form onSubmit={handleSubmit}>
                             <input
@@ -970,8 +1087,8 @@
                                 autoFocus
                             />
                             <div className="flex justify-end gap-4 mt-6">
-                                <button type="button" onClick={onClose} className="py-2 px-4 bg-slate-200 hover:bg-slate-300 rounded-md font-semibold">Cancel</button>
-                                <button type="submit" className="py-2 px-4 bg-blue-500 hover:bg-blue-600 text-white rounded-md font-semibold">Add Guest</button>
+                                <button type="button" onClick={handleClose} className="py-2 px-4 bg-slate-200 hover:bg-slate-300 rounded-md font-semibold transition-colors">Cancel</button>
+                                <button type="submit" className="py-2 px-4 bg-blue-500 hover:bg-blue-600 text-white rounded-md font-semibold transition-colors">Add Guest</button>
                             </div>
                         </form>
                     </div>
@@ -990,23 +1107,12 @@
             const [splitType, setSplitType] = useState('equally');
             const [splitDetails, setSplitDetails] = useState({});
             const [error, setError] = useState('');
+            const [isAnimating, setIsAnimating] = useState(false);
 
-            const resetState = () => {
-                const firstGuestId = guests.length > 0 ? guests[0].id : '';
-                setDescription('');
-                setAmount('');
-                setDate(new Date().toISOString().split('T')[0]);
-                setPaidById(firstGuestId);
-                setSplitWith(guests.map(g => g.id));
-                setCategory(CATEGORIES[0]);
-                setSplitType('equally');
-                setSplitDetails(guests.reduce((acc, g) => ({...acc, [g.id]: ''}), {}));
-                setError('');
-            };
-            
             useEffect(() => {
                 if (isOpen) {
-                    if (expenseToEdit) {
+                    setError('');
+                    if(expenseToEdit) {
                         setDescription(expenseToEdit.description);
                         setAmount(expenseToEdit.amount.toString());
                         setDate(expenseToEdit.date);
@@ -1014,17 +1120,32 @@
                         setSplitWith(expenseToEdit.splitWith || []);
                         setCategory(expenseToEdit.category || CATEGORIES[0]);
                         setSplitType(expenseToEdit.splitType || 'equally');
-                        // Ensure splitDetails is populated for all guests, not just those in the expense
                         const details = guests.reduce((acc, g) => ({...acc, [g.id]: ''}), {});
                         if (expenseToEdit.splitDetails) {
                             Object.assign(details, expenseToEdit.splitDetails);
                         }
                         setSplitDetails(details);
                     } else {
-                        resetState();
+                        const firstGuestId = guests.length > 0 ? guests[0].id : '';
+                        setDescription('');
+                        setAmount('');
+                        setDate(new Date().toISOString().split('T')[0]);
+                        setPaidById(firstGuestId);
+                        setSplitWith(guests.map(g => g.id));
+                        setCategory(CATEGORIES[0]);
+                        setSplitType('equally');
+                        setSplitDetails(guests.reduce((acc, g) => ({...acc, [g.id]: ''}), {}));
                     }
+                     requestAnimationFrame(() => setIsAnimating(true));
+                } else {
+                     setIsAnimating(false);
                 }
             }, [isOpen, guests, expenseToEdit]);
+
+            const handleClose = () => {
+                setIsAnimating(false);
+                setTimeout(onClose, 300);
+            };
 
             const handleDetailChange = (guestId, value) => {
                 setSplitDetails(prev => ({ ...prev, [guestId]: value }));
@@ -1072,14 +1193,20 @@
                 } else {
                     onAddExpense(expenseData);
                 }
-                onClose();
+                handleClose();
             };
             
-            if (!isOpen) return null;
+            if (!isOpen && !isAnimating) return null;
 
             return (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-start z-50 p-4 overflow-y-auto">
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6 my-8">
+                <div 
+                    className={`fixed inset-0 z-50 flex justify-center items-start p-4 bg-black overflow-y-auto transition-opacity duration-300 ${isAnimating ? 'bg-opacity-50' : 'bg-opacity-0'}`}
+                    onClick={handleClose}
+                >
+                    <div 
+                        className={`bg-white rounded-lg shadow-xl w-full max-w-lg p-6 my-8 transform transition-all duration-300 ${isAnimating ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}
+                        onClick={e => e.stopPropagation()}
+                    >
                         <h2 className="text-2xl font-bold mb-6">{expenseToEdit ? 'Edit Expense' : 'Add an Expense'}</h2>
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div>
@@ -1155,8 +1282,8 @@
                             </div>
                             {error && <p className="text-red-500 text-sm font-semibold">{error}</p>}
                             <div className="flex justify-end gap-4 pt-4">
-                                <button type="button" onClick={onClose} className="py-2 px-4 bg-slate-200 hover:bg-slate-300 rounded-md font-semibold">Cancel</button>
-                                <button type="submit" className="py-2 px-4 bg-green-500 hover:bg-green-600 text-white rounded-md font-semibold">
+                                <button type="button" onClick={handleClose} className="py-2 px-4 bg-slate-200 hover:bg-slate-300 rounded-md font-semibold transition-colors">Cancel</button>
+                                <button type="submit" className="py-2 px-4 bg-green-500 hover:bg-green-600 text-white rounded-md font-semibold transition-colors">
                                     {expenseToEdit ? 'Save Changes' : 'Add Expense'}
                                 </button>
                             </div>
@@ -1166,23 +1293,49 @@
             );
         }
 
-        function ConfirmationModal({ isOpen, onClose, onConfirm, title, confirmButtonText, children }) {
-            if (!isOpen) return null;
+        function ConfirmationModal({ isOpen, onClose, onConfirm, title, confirmButtonText, cancelButtonText, children }) {
+            const [isAnimating, setIsAnimating] = useState(false);
+
+            useEffect(() => {
+                if (isOpen) {
+                    requestAnimationFrame(() => setIsAnimating(true));
+                } else {
+                    setIsAnimating(false);
+                }
+            }, [isOpen]);
+
+            const handleClose = () => {
+                setIsAnimating(false);
+                setTimeout(onClose, 300);
+            };
+
+             const handleConfirm = () => {
+                onConfirm();
+                // handleClose(); // The confirm handler now closes the modal.
+            };
+
+            if (!isOpen && !isAnimating) return null;
 
             return (
-                <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 p-4">
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+                <div 
+                    className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-black transition-opacity duration-300 ${isAnimating ? 'bg-opacity-60' : 'bg-opacity-0'}`}
+                    onClick={handleClose}
+                >
+                    <div 
+                        className={`bg-white rounded-lg shadow-xl w-full max-w-md p-6 transform transition-all duration-300 ${isAnimating ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}
+                        onClick={e => e.stopPropagation()}
+                    >
                         <h3 className="text-xl font-bold mb-4 text-slate-800">{title}</h3>
                         <div className="text-slate-600 mb-8">{children}</div>
                         <div className="flex justify-end gap-4">
                             <button 
-                                onClick={onClose} 
+                                onClick={handleClose} 
                                 className="py-2 px-5 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-md font-semibold transition-colors"
                             >
-                                Cancel
+                                {cancelButtonText || 'Cancel'}
                             </button>
                             <button 
-                                onClick={onConfirm} 
+                                onClick={handleConfirm} 
                                 className="py-2 px-5 bg-red-500 hover:bg-red-600 text-white rounded-md font-semibold transition-colors"
                             >
                                 {confirmButtonText}
