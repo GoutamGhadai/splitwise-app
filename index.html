@@ -44,7 +44,7 @@
         const generateId = () => `_${Math.random().toString(36).substr(2, 9)}`;
 
         const calculateSettlement = (trip) => {
-            if (!trip || trip.guests.length < 2 || trip.expenses.length === 0) {
+            if (!trip || trip.guests.length < 2) {
                 return { transactions: [] };
             }
             
@@ -52,15 +52,38 @@
             const balances = guests.reduce((acc, guest) => ({ ...acc, [guest.id]: 0 }), {});
 
             expenses.forEach(expense => {
-                const amount = parseFloat(expense.amount);
-                const payerId = expense.paidById;
-                const splitCount = expense.splitWith.length;
-                if (splitCount === 0 || isNaN(amount) || amount <= 0) return;
-                const share = amount / splitCount;
-                if (balances[payerId] !== undefined) balances[payerId] += amount;
-                expense.splitWith.forEach(guestId => {
-                     if (balances[guestId] !== undefined) balances[guestId] -= share;
-                });
+                const totalAmount = parseFloat(expense.amount);
+                if (balances[expense.paidById] !== undefined) {
+                    balances[expense.paidById] += totalAmount;
+                }
+
+                switch (expense.splitType) {
+                    case 'amounts':
+                        Object.entries(expense.splitDetails || {}).forEach(([guestId, amount]) => {
+                            if (balances[guestId] !== undefined) {
+                                balances[guestId] -= parseFloat(amount);
+                            }
+                        });
+                        break;
+                    case 'percentages':
+                        Object.entries(expense.splitDetails || {}).forEach(([guestId, percentage]) => {
+                            if (balances[guestId] !== undefined) {
+                                const share = totalAmount * (parseFloat(percentage) / 100);
+                                balances[guestId] -= share;
+                            }
+                        });
+                        break;
+                    default: // 'equally'
+                        if (expense.splitWith.length > 0) {
+                            const share = totalAmount / expense.splitWith.length;
+                            expense.splitWith.forEach(guestId => {
+                                if (balances[guestId] !== undefined) {
+                                    balances[guestId] -= share;
+                                }
+                            });
+                        }
+                        break;
+                }
             });
 
             const debtors = [];
@@ -338,28 +361,49 @@
 
             const guestSummaries = useMemo(() => {
                 if (!activeTrip) return {};
-
+            
                 const summaries = activeTrip.guests.reduce((acc, guest) => {
                     acc[guest.id] = { paid: 0, share: 0 };
                     return acc;
                 }, {});
-
+            
                 activeTrip.expenses.forEach(expense => {
-                    const amount = parseFloat(expense.amount);
-                    if (isNaN(amount) || amount <= 0 || expense.splitWith.length === 0) return;
-
+                    const totalAmount = parseFloat(expense.amount);
+                    if (isNaN(totalAmount) || totalAmount <= 0) return;
+            
                     if (summaries[expense.paidById]) {
-                        summaries[expense.paidById].paid += amount;
+                        summaries[expense.paidById].paid += totalAmount;
                     }
-
-                    const share = amount / expense.splitWith.length;
-                    expense.splitWith.forEach(guestId => {
-                        if (summaries[guestId]) {
-                            summaries[guestId].share += share;
-                        }
-                    });
+            
+                    switch (expense.splitType) {
+                        case 'amounts':
+                            Object.entries(expense.splitDetails || {}).forEach(([guestId, amount]) => {
+                                if (summaries[guestId]) {
+                                    summaries[guestId].share += parseFloat(amount);
+                                }
+                            });
+                            break;
+                        case 'percentages':
+                             Object.entries(expense.splitDetails || {}).forEach(([guestId, percentage]) => {
+                                if (summaries[guestId]) {
+                                    const share = totalAmount * (parseFloat(percentage) / 100);
+                                    summaries[guestId].share += share;
+                                }
+                            });
+                            break;
+                        default: // 'equally'
+                            if (expense.splitWith.length > 0) {
+                                const share = totalAmount / expense.splitWith.length;
+                                expense.splitWith.forEach(guestId => {
+                                    if (summaries[guestId]) {
+                                        summaries[guestId].share += share;
+                                    }
+                                });
+                            }
+                            break;
+                    }
                 });
-
+            
                 return summaries;
             }, [activeTrip]);
 
@@ -589,7 +633,7 @@
                                                         Paid by <span className="font-semibold">{guestMap[expense.paidById]}</span> on {new Date(expense.date).toLocaleDateString()}
                                                     </p>
                                                     <p className="text-sm text-slate-500 mt-1 pl-5">
-                                                        Split with: {expense.splitWith.map(id => guestMap[id]).join(', ')}
+                                                        {expense.splitType === 'equally' ? `Split equally with: ${expense.splitWith.map(id => guestMap[id]).join(', ')}` : `Split unequally`}
                                                     </p>
                                                 </div>
                                                 <div className="text-right flex-shrink-0 ml-4">
@@ -831,53 +875,86 @@
             const [paidById, setPaidById] = useState('');
             const [splitWith, setSplitWith] = useState([]);
             const [category, setCategory] = useState(CATEGORIES[0]);
+            const [splitType, setSplitType] = useState('equally');
+            const [splitDetails, setSplitDetails] = useState({});
             const [error, setError] = useState('');
 
+            const resetState = () => {
+                const firstGuestId = guests.length > 0 ? guests[0].id : '';
+                setDescription('');
+                setAmount('');
+                setDate(new Date().toISOString().split('T')[0]);
+                setPaidById(firstGuestId);
+                setSplitWith(guests.map(g => g.id));
+                setCategory(CATEGORIES[0]);
+                setSplitType('equally');
+                setSplitDetails(guests.reduce((acc, g) => ({...acc, [g.id]: ''}), {}));
+                setError('');
+            };
+            
             useEffect(() => {
                 if (isOpen) {
-                    setError('');
-                    if(expenseToEdit) {
+                    if (expenseToEdit) {
                         setDescription(expenseToEdit.description);
                         setAmount(expenseToEdit.amount.toString());
                         setDate(expenseToEdit.date);
                         setPaidById(expenseToEdit.paidById);
-                        setSplitWith(expenseToEdit.splitWith);
+                        setSplitWith(expenseToEdit.splitWith || []);
                         setCategory(expenseToEdit.category || CATEGORIES[0]);
+                        setSplitType(expenseToEdit.splitType || 'equally');
+                        // Ensure splitDetails is populated for all guests, not just those in the expense
+                        const details = guests.reduce((acc, g) => ({...acc, [g.id]: ''}), {});
+                        if (expenseToEdit.splitDetails) {
+                            Object.assign(details, expenseToEdit.splitDetails);
+                        }
+                        setSplitDetails(details);
                     } else {
-                        setDescription('');
-                        setAmount('');
-                        setDate(new Date().toISOString().split('T')[0]);
-                        setPaidById(guests.length > 0 ? guests[0].id : '');
-                        setSplitWith(guests.map(g => g.id));
-                        setCategory(CATEGORIES[0]);
+                        resetState();
                     }
                 }
             }, [isOpen, guests, expenseToEdit]);
 
-
-            const handleSplitChange = (guestId) => {
-                setSplitWith(prev => 
-                    prev.includes(guestId) ? prev.filter(id => id !== guestId) : [...prev, guestId]
-                );
+            const handleDetailChange = (guestId, value) => {
+                setSplitDetails(prev => ({ ...prev, [guestId]: value }));
             };
+
+            const unevenSplitTotal = useMemo(() => {
+                return Object.entries(splitDetails).reduce((total, [guestId, value]) => {
+                    if (splitWith.includes(guestId)) {
+                        return total + (parseFloat(value) || 0);
+                    }
+                    return total;
+                }, 0);
+            }, [splitDetails, splitWith]);
 
             const handleSubmit = (e) => {
                 e.preventDefault();
                 const numAmount = parseFloat(amount);
-                if (!description.trim()) {
-                     setError('Description is required.'); return;
-                }
-                if (isNaN(numAmount) || numAmount <= 0) {
-                    setError('Please enter a valid positive amount.'); return;
-                }
-                if (!paidById) {
-                    setError('Please select who paid.'); return;
-                }
-                if (splitWith.length === 0) {
-                     setError('Please select at least one person to split with.'); return;
+                if (!description.trim()) { setError('Description is required.'); return; }
+                if (isNaN(numAmount) || numAmount <= 0) { setError('Please enter a valid positive amount.'); return; }
+                if (!paidById) { setError('Please select who paid.'); return; }
+                if (splitWith.length === 0) { setError('Please select at least one person to split with.'); return; }
+
+                if (splitType === 'amounts') {
+                    if (Math.abs(unevenSplitTotal - numAmount) > 0.01) {
+                        setError(`The sum of amounts (₹${unevenSplitTotal.toFixed(2)}) must equal the total expense (₹${numAmount.toFixed(2)}).`);
+                        return;
+                    }
+                } else if (splitType === 'percentages') {
+                    if (Math.abs(unevenSplitTotal - 100) > 0.01) {
+                        setError(`The sum of percentages (${unevenSplitTotal.toFixed(2)}%) must be 100%.`);
+                        return;
+                    }
                 }
                 
-                const expenseData = { description: description.trim(), amount: numAmount, date, paidById, splitWith, category };
+                const finalSplitDetails = Object.entries(splitDetails).reduce((acc, [guestId, value]) => {
+                    if (splitWith.includes(guestId) && (value || 0) > 0) {
+                        acc[guestId] = value;
+                    }
+                    return acc;
+                }, {});
+
+                const expenseData = { description: description.trim(), amount: numAmount, date, paidById, splitWith, category, splitType, splitDetails: finalSplitDetails };
                 if (expenseToEdit) {
                     onUpdateExpense(expenseToEdit.id, expenseData);
                 } else {
@@ -921,20 +998,47 @@
                                 </select>
                             </div>
                             <div>
-                                <label className="block font-semibold mb-2">Split with</label>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                                    <div className="col-span-full">
-                                        <button type="button" onClick={() => setSplitWith(guests.map(g => g.id))} className="text-sm text-blue-600 hover:underline">Select All</button>
-                                        <span className="mx-2 text-slate-300">|</span>
-                                        <button type="button" onClick={() => setSplitWith([])} className="text-sm text-blue-600 hover:underline">Deselect All</button>
-                                    </div>
-                                    {guests.map(g => (
-                                        <label key={g.id} className="flex items-center gap-2 p-2 border rounded-md cursor-pointer hover:bg-slate-50">
-                                            <input type="checkbox" checked={splitWith.includes(g.id)} onChange={() => handleSplitChange(g.id)} className="h-4 w-4 rounded text-blue-600 focus:ring-blue-500" />
-                                            <span>{g.name}</span>
-                                        </label>
+                                <label className="block font-semibold mb-2">Split</label>
+                                <div className="flex items-center gap-4 mb-3 border border-slate-200 rounded-lg p-1">
+                                    {['equally', 'amounts', 'percentages'].map(type => (
+                                        <button key={type} type="button" onClick={() => setSplitType(type)} className={`flex-1 py-1 px-2 text-sm rounded-md capitalize transition-colors ${splitType === type ? 'bg-blue-500 text-white' : 'bg-transparent text-slate-600 hover:bg-slate-100'}`}>
+                                            {type}
+                                        </button>
                                     ))}
                                 </div>
+                                <div className="space-y-2">
+                                    {guests.map(g => (
+                                        <div key={g.id} className={`flex items-center gap-2 p-2 border rounded-md transition-colors ${splitWith.includes(g.id) ? 'bg-blue-50' : 'bg-slate-50'}`}>
+                                            <input 
+                                                type="checkbox" 
+                                                checked={splitWith.includes(g.id)} 
+                                                onChange={() => setSplitWith(prev => prev.includes(g.id) ? prev.filter(id => id !== g.id) : [...prev, g.id])}
+                                                className="h-4 w-4 rounded text-blue-600 focus:ring-blue-500" 
+                                            />
+                                            <label className="flex-1 cursor-pointer">{g.name}</label>
+                                            {splitType !== 'equally' && splitWith.includes(g.id) && (
+                                                <div className="relative">
+                                                    {splitType === 'amounts' && <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400">₹</span>}
+                                                    <input 
+                                                        type="number" 
+                                                        value={splitDetails[g.id] || ''}
+                                                        onChange={(e) => handleDetailChange(g.id, e.target.value)}
+                                                        className={`w-24 p-1 border rounded-md ${splitType === 'amounts' ? 'pl-5' : 'pr-5'}`}
+                                                        placeholder="0.00"
+                                                        min="0"
+                                                        step="0.01"
+                                                    />
+                                                    {splitType === 'percentages' && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400">%</span>}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                                {splitType !== 'equally' && (
+                                    <div className="text-right text-sm font-semibold mt-2 pr-2">
+                                        Total: {unevenSplitTotal.toFixed(2)}{splitType === 'percentages' ? '%' : ''}
+                                    </div>
+                                )}
                             </div>
                             {error && <p className="text-red-500 text-sm font-semibold">{error}</p>}
                             <div className="flex justify-end gap-4 pt-4">
