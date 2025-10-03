@@ -39,9 +39,22 @@
             Activities: '#10b981', // emerald-500
             Other: '#64748b', // slate-500
         };
-
+        const AVATAR_COLORS = ['#f87171', '#fb923c', '#facc15', '#4ade80', '#38bdf8', '#a78bfa', '#f472b6'];
 
         const generateId = () => `_${Math.random().toString(36).substr(2, 9)}`;
+
+        const getInitials = (name = '') => {
+            const parts = name.split(' ');
+            if (parts.length > 1) {
+                return parts[0][0] + parts[parts.length - 1][0];
+            }
+            return name.substring(0, 2);
+        };
+
+        const generateAvatarColor = (name = '') => {
+            const charCodeSum = name.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
+            return AVATAR_COLORS[charCodeSum % AVATAR_COLORS.length];
+        };
 
         const calculateSettlement = (trip) => {
             if (!trip || trip.guests.length < 2) {
@@ -564,13 +577,16 @@
                                             const summary = guestSummaries[guest.id] || { paid: 0, share: 0 };
                                             return (
                                                 <li key={guest.id} className="bg-slate-50 p-3 rounded-lg">
-                                                    <div className="flex justify-between items-start">
-                                                        <span className="font-bold text-lg text-slate-800">{guest.name}</span>
+                                                    <div className="flex justify-between items-center">
+                                                        <div className="flex items-center gap-3">
+                                                            <Avatar name={guest.name} />
+                                                            <span className="font-bold text-lg text-slate-800">{guest.name}</span>
+                                                        </div>
                                                         <button onClick={() => removeGuest(guest.id)} className="text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-100 flex-shrink-0">
                                                             <TrashIcon />
                                                         </button>
                                                     </div>
-                                                    <div className="flex justify-between items-center mt-2 text-sm">
+                                                    <div className="flex justify-between items-center mt-2 text-sm pl-11">
                                                         <span className="font-semibold text-green-600">Paid: ₹{summary.paid.toFixed(2)}</span>
                                                         <span className="font-semibold text-orange-600">Share: ₹{summary.share.toFixed(2)}</span>
                                                     </div>
@@ -672,7 +688,7 @@
                                                 return (
                                                     <li 
                                                         key={index} 
-                                                        className="flex items-center justify-between bg-amber-50 p-4 rounded-lg gap-4"
+                                                        className="flex items-center justify-between bg-amber-50 p-4 rounded-lg gap-2"
                                                     >
                                                         <input
                                                             type="checkbox"
@@ -680,12 +696,14 @@
                                                             onChange={() => handleTogglePaid(activeTrip.id, settlementKey)}
                                                             className="h-5 w-5 rounded text-blue-600 focus:ring-blue-500 border-gray-300 flex-shrink-0"
                                                         />
-                                                        <div className="flex-1 min-w-0 cursor-pointer lg:cursor-default" onClick={() => setExpandedSettlementIndex(expandedSettlementIndex === index ? null : index)}>
+                                                        <div className="flex-1 min-w-0 flex items-center gap-2 cursor-pointer lg:cursor-default" onClick={() => setExpandedSettlementIndex(expandedSettlementIndex === index ? null : index)}>
+                                                            <Avatar name={guestMap[t.from]} size="sm" />
                                                             <p className={`${expandedSettlementIndex === index ? 'whitespace-normal' : 'truncate'} text-sm sm:text-base ${isPaid ? 'line-through text-slate-400' : ''}`}>
                                                                 <span className="font-bold text-blue-600">{guestMap[t.from]}</span>
                                                                 <span className="text-slate-500"> owes </span>
                                                                 <span className="font-bold text-green-600">{guestMap[t.to]}</span>
                                                             </p>
+                                                            <Avatar name={guestMap[t.to]} size="sm" />
                                                         </div>
                                                         <span className={`font-bold text-lg sm:text-xl text-slate-800 whitespace-nowrap ${isPaid ? 'line-through text-slate-400' : ''}`}>₹{t.amount.toFixed(2)}</span>
                                                     </li>
@@ -723,6 +741,22 @@
         }
 
         // --- Child Components ---
+
+        function Avatar({ name, size = 'md' }) {
+            const sizeClasses = {
+                sm: 'w-6 h-6 text-xs',
+                md: 'w-8 h-8 text-sm'
+            };
+
+            return (
+                <div 
+                    className={`rounded-full flex items-center justify-center font-bold text-white flex-shrink-0 ${sizeClasses[size]}`}
+                    style={{ backgroundColor: generateAvatarColor(name) }}
+                >
+                    {getInitials(name)}
+                </div>
+            );
+        }
 
         function PieChart({ data }) {
             const total = data.reduce((sum, item) => sum + item.amount, 0);
@@ -1015,6 +1049,7 @@
                                                 onChange={() => setSplitWith(prev => prev.includes(g.id) ? prev.filter(id => id !== g.id) : [...prev, g.id])}
                                                 className="h-4 w-4 rounded text-blue-600 focus:ring-blue-500" 
                                             />
+                                            <Avatar name={g.name} size="sm" />
                                             <label className="flex-1 cursor-pointer">{g.name}</label>
                                             {splitType !== 'equally' && splitWith.includes(g.id) && (
                                                 <div className="relative">
