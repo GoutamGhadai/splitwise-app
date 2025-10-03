@@ -26,8 +26,6 @@
 
     <script type="text/babel">
         // --- React Application Code ---
-        // The entire content of your splitwise-app.jsx file is placed here.
-
         const { useState, useEffect, useMemo } = React;
 
         // --- Helper Functions & Constants ---
@@ -133,16 +131,22 @@
             const [editingTrip, setEditingTrip] = useState(null);
             const [editingExpenseId, setEditingExpenseId] = useState(null);
             const [expandedSettlementIndex, setExpandedSettlementIndex] = useState(null);
-            const [confirmAction, setConfirmAction] = useState(null); 
+            const [confirmAction, setConfirmAction] = useState(null);
+            const [actionTargetId, setActionTargetId] = useState(null);
 
             // --- Data Persistence using localStorage ---
             useEffect(() => {
                 try {
                     const savedData = localStorage.getItem(APP_STORAGE_KEY);
                     if (savedData) {
-                        const { trips, activeTripId } = JSON.parse(savedData);
-                        setTrips(trips || []);
-                        setActiveTripId(activeTripId || null);
+                        const parsedData = JSON.parse(savedData);
+                        // Ensure old data has the new paidSettlements property
+                        const sanitizedTrips = (parsedData.trips || []).map(trip => ({
+                            ...trip,
+                            paidSettlements: trip.paidSettlements || {}
+                        }));
+                        setTrips(sanitizedTrips);
+                        setActiveTripId(parsedData.activeTripId || null);
                     }
                 } catch (error) {
                     console.error("Failed to load data from localStorage", error);
@@ -163,7 +167,7 @@
                 if (editingTrip) { // Update existing trip
                     setTrips(prev => prev.map(t => t.id === editingTrip.id ? { ...t, name: tripData.name, date: tripData.date } : t));
                 } else { // Create new trip
-                    const newTrip = { id: generateId(), name: tripData.name, date: tripData.date, guests: [], expenses: [] };
+                    const newTrip = { id: generateId(), name: tripData.name, date: tripData.date, guests: [], expenses: [], paidSettlements: {} };
                     setTrips(prev => [...prev, newTrip]);
                     setActiveTripId(newTrip.id);
                 }
@@ -174,12 +178,31 @@
             const handleEditTrip = (trip) => {
                 setEditingTrip(trip);
                 setTripModalOpen(true);
-            }
+            };
+
+            const deleteTrip = (tripId) => {
+                setTrips(prev => prev.filter(t => t.id !== tripId));
+            };
             
             const modifyActiveTrip = (updater) => {
                 setTrips(prevTrips =>
                     prevTrips.map(t => (t.id === activeTripId ? updater(t) : t))
                 );
+            };
+            
+            const handleTogglePaid = (tripId, settlementKey) => {
+                setTrips(prevTrips => prevTrips.map(trip => {
+                    if (trip.id === tripId) {
+                        const newPaidSettlements = { ...(trip.paidSettlements || {}) };
+                        if (newPaidSettlements[settlementKey]) {
+                            delete newPaidSettlements[settlementKey];
+                        } else {
+                            newPaidSettlements[settlementKey] = true;
+                        }
+                        return { ...trip, paidSettlements: newPaidSettlements };
+                    }
+                    return trip;
+                }));
             };
             
             // --- Handlers for Guests & Expenses (now operate on the active trip) ---
@@ -196,30 +219,39 @@
                         .filter(exp => exp.paidById !== id)
                         .map(exp => ({ ...exp, splitWith: exp.splitWith.filter(guestId => guestId !== id) }))
                         .filter(exp => exp.splitWith.length > 0);
-                    return { ...trip, guests: trip.guests.filter(g => g.id !== id), expenses: updatedExpenses };
+                    // Removing a guest changes settlements, so we must clear the paid status log.
+                    return { ...trip, guests: trip.guests.filter(g => g.id !== id), expenses: updatedExpenses, paidSettlements: {} };
                 });
             };
 
             const addExpense = (expense) => {
-                modifyActiveTrip(trip => ({ ...trip, expenses: [...trip.expenses, { ...expense, id: generateId() }] }));
+                // Adding an expense changes settlements, so we must clear the paid status log.
+                modifyActiveTrip(trip => ({ ...trip, expenses: [...trip.expenses, { ...expense, id: generateId() }], paidSettlements: {} }));
             };
             
             const updateExpense = (id, updatedData) => {
-                modifyActiveTrip(trip => ({ ...trip, expenses: trip.expenses.map(exp => (exp.id === id ? { ...exp, ...updatedData } : exp)) }));
+                // Updating an expense changes settlements, so we must clear the paid status log.
+                modifyActiveTrip(trip => ({ ...trip, expenses: trip.expenses.map(exp => (exp.id === id ? { ...exp, ...updatedData } : exp)), paidSettlements: {} }));
                 setEditingExpenseId(null);
             };
             
             const removeExpense = (id) => {
-                 modifyActiveTrip(trip => ({...trip, expenses: trip.expenses.filter(exp => exp.id !== id) }));
+                // Removing an expense changes settlements, so we must clear the paid status log.
+                modifyActiveTrip(trip => ({...trip, expenses: trip.expenses.filter(exp => exp.id !== id), paidSettlements: {} }));
             };
 
             const handleConfirm = () => {
                 if (confirmAction === 'removeAllGuests') {
-                    modifyActiveTrip(trip => ({ ...trip, guests: [], expenses: [] }));
+                    // Clearing guests also clears expenses, so settlements are gone. Reset paid status.
+                    modifyActiveTrip(trip => ({ ...trip, guests: [], expenses: [], paidSettlements: {} }));
                 } else if (confirmAction === 'removeAllExpenses') {
-                    modifyActiveTrip(trip => ({ ...trip, expenses: [] }));
+                    // Clearing expenses means settlements are gone. Reset paid status.
+                    modifyActiveTrip(trip => ({ ...trip, expenses: [], paidSettlements: {} }));
+                } else if (confirmAction === 'deleteTrip') {
+                    deleteTrip(actionTargetId);
                 }
                 setConfirmAction(null);
+                setActionTargetId(null);
             };
             
             const handleOpenAddExpenseModal = () => {
@@ -271,6 +303,9 @@
                                                     <button onClick={(e) => { e.stopPropagation(); handleEditTrip(trip); }} className="text-blue-500 hover:text-blue-700 p-2 rounded-full hover:bg-blue-100">
                                                         <EditIcon />
                                                     </button>
+                                                    <button onClick={(e) => { e.stopPropagation(); setActionTargetId(trip.id); setConfirmAction('deleteTrip'); }} className="text-red-500 hover:text-red-700 p-2 rounded-full hover:bg-red-100">
+                                                        <TrashIcon />
+                                                    </button>
                                                     <button onClick={(e) => { e.stopPropagation(); setActiveTripId(trip.id); }} className="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-lg">
                                                         Open
                                                     </button>
@@ -281,16 +316,26 @@
                                                     <h3 className="text-lg font-semibold mb-2 text-left text-slate-700">Settlement Plan</h3>
                                                     {transactions.length > 0 ? (
                                                         <ul className="space-y-2">
-                                                            {transactions.map((t, index) => (
-                                                                <li key={index} className="flex items-center justify-between bg-amber-50 p-3 rounded-lg gap-2">
-                                                                    <p className="truncate text-sm">
-                                                                        <span className="font-bold text-blue-600">{tripGuestMap[t.from]}</span>
-                                                                        <span className="text-slate-500"> owes </span>
-                                                                        <span className="font-bold text-green-600">{tripGuestMap[t.to]}</span>
-                                                                    </p>
-                                                                    <span className="font-bold text-md text-slate-800 whitespace-nowrap">₹{t.amount.toFixed(2)}</span>
-                                                                </li>
-                                                            ))}
+                                                            {transactions.map((t, index) => {
+                                                                const settlementKey = `${t.from}-${t.to}-${t.amount.toFixed(2)}`;
+                                                                const isPaid = trip.paidSettlements && trip.paidSettlements[settlementKey];
+                                                                return (
+                                                                    <li key={index} className="flex items-center justify-between bg-amber-50 p-3 rounded-lg gap-2">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={isPaid || false}
+                                                                            onChange={() => handleTogglePaid(trip.id, settlementKey)}
+                                                                            className="h-4 w-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300"
+                                                                        />
+                                                                        <p className={`flex-1 truncate text-sm ${isPaid ? 'line-through text-slate-400' : ''}`}>
+                                                                            <span className="font-bold text-blue-600">{tripGuestMap[t.from]}</span>
+                                                                            <span className="text-slate-500"> owes </span>
+                                                                            <span className="font-bold text-green-600">{tripGuestMap[t.to]}</span>
+                                                                        </p>
+                                                                        <span className={`font-bold text-md text-slate-800 whitespace-nowrap ${isPaid ? 'line-through text-slate-400' : ''}`}>₹{t.amount.toFixed(2)}</span>
+                                                                    </li>
+                                                                );
+                                                            })}
                                                         </ul>
                                                     ) : (
                                                         <p className="text-slate-500 text-left">All settled up!</p>
@@ -305,6 +350,15 @@
                             </div>
                         </div>
                         <TripModal isOpen={isTripModalOpen} onClose={() => { setTripModalOpen(false); setEditingTrip(null); }} onTripAction={handleTripAction} tripToEdit={editingTrip} />
+                        <ConfirmationModal
+                            isOpen={confirmAction === 'deleteTrip'}
+                            onClose={() => { setConfirmAction(null); setActionTargetId(null); }}
+                            onConfirm={handleConfirm}
+                            title="Delete Trip?"
+                            confirmButtonText="Yes, Delete Trip"
+                        >
+                            <p>Are you sure? This action will permanently delete this trip and all its data. This cannot be undone.</p>
+                        </ConfirmationModal>
                     </div>
                 );
             }
@@ -414,22 +468,31 @@
                                     <div className="bg-white p-5 rounded-xl shadow-md">
                                         <h2 className="text-xl font-semibold mb-4">How to Settle Up</h2>
                                         <ul className="space-y-3">
-                                            {settlement.transactions.map((t, index) => (
-                                                <li 
-                                                    key={index} 
-                                                    className="flex items-center justify-between bg-amber-50 p-4 rounded-lg gap-4 cursor-pointer lg:cursor-default"
-                                                    onClick={() => setExpandedSettlementIndex(expandedSettlementIndex === index ? null : index)}
-                                                >
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className={`${expandedSettlementIndex === index ? 'whitespace-normal' : 'truncate'} text-sm sm:text-base`}>
-                                                            <span className="font-bold text-blue-600">{guestMap[t.from]}</span>
-                                                            <span className="text-slate-500"> owes </span>
-                                                            <span className="font-bold text-green-600">{guestMap[t.to]}</span>
-                                                        </p>
-                                                    </div>
-                                                    <span className="font-bold text-lg sm:text-xl text-slate-800 whitespace-nowrap">₹{t.amount.toFixed(2)}</span>
-                                                </li>
-                                            ))}
+                                            {settlement.transactions.map((t, index) => {
+                                                const settlementKey = `${t.from}-${t.to}-${t.amount.toFixed(2)}`;
+                                                const isPaid = activeTrip.paidSettlements && activeTrip.paidSettlements[settlementKey];
+                                                return (
+                                                    <li 
+                                                        key={index} 
+                                                        className="flex items-center justify-between bg-amber-50 p-4 rounded-lg gap-4"
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={isPaid || false}
+                                                            onChange={() => handleTogglePaid(activeTrip.id, settlementKey)}
+                                                            className="h-5 w-5 rounded text-blue-600 focus:ring-blue-500 border-gray-300 flex-shrink-0"
+                                                        />
+                                                        <div className="flex-1 min-w-0 cursor-pointer lg:cursor-default" onClick={() => setExpandedSettlementIndex(expandedSettlementIndex === index ? null : index)}>
+                                                            <p className={`${expandedSettlementIndex === index ? 'whitespace-normal' : 'truncate'} text-sm sm:text-base ${isPaid ? 'line-through text-slate-400' : ''}`}>
+                                                                <span className="font-bold text-blue-600">{guestMap[t.from]}</span>
+                                                                <span className="text-slate-500"> owes </span>
+                                                                <span className="font-bold text-green-600">{guestMap[t.to]}</span>
+                                                            </p>
+                                                        </div>
+                                                        <span className={`font-bold text-lg sm:text-xl text-slate-800 whitespace-nowrap ${isPaid ? 'line-through text-slate-400' : ''}`}>₹{t.amount.toFixed(2)}</span>
+                                                    </li>
+                                                );
+                                            })}
                                         </ul>
                                     </div>
                                 )}
@@ -448,7 +511,7 @@
                         expenseToEdit={activeTrip.expenses.find(exp => exp.id === editingExpenseId)}
                     />
                      <ConfirmationModal
-                        isOpen={!!confirmAction}
+                        isOpen={!!confirmAction && (confirmAction === 'removeAllGuests' || confirmAction === 'removeAllExpenses')}
                         onClose={() => setConfirmAction(null)}
                         onConfirm={handleConfirm}
                         title={confirmAction === 'removeAllGuests' ? "Remove All Guests?" : "Remove All Expenses?"}
@@ -711,3 +774,4 @@
     </script>
 </body>
 </html>
+
