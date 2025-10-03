@@ -12,6 +12,19 @@
         body {
             font-family: 'Inter', sans-serif;
         }
+        /* Simple spinner for loading state */
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 4px solid #3498db;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body class="bg-slate-100">
@@ -23,13 +36,42 @@
 
     <!-- Babel Standalone for JSX compilation in the browser -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, collection, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- Make Firebase functions available globally for the Babel script ---
+        window.firebase = {
+            initializeApp,
+            getAuth,
+            signInAnonymously,
+            signInWithCustomToken,
+            onAuthStateChanged,
+            getFirestore,
+            doc,
+            collection,
+            addDoc,
+            updateDoc,
+            deleteDoc,
+            onSnapshot,
+            query,
+            where,
+            arrayUnion,
+        };
+    </script>
+
 
     <script type="text/babel">
         // --- React Application Code ---
-        const { useState, useEffect, useMemo } = React;
+        const { useState, useEffect, useMemo, useCallback } = React;
+        
+        // --- Firebase Globals from the module script ---
+        const { initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, getFirestore, doc, collection, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, arrayUnion } = window.firebase;
 
         // --- Helper Functions & Constants ---
-        const APP_STORAGE_KEY = 'splitwiseAppData_v2';
         const CATEGORIES = ['Food', 'Travel', 'Accommodation', 'Shopping', 'Activities', 'Other'];
         const CATEGORY_COLORS = {
             Food: '#f59e0b', // amber-500
@@ -44,7 +86,7 @@
         const generateId = () => `_${Math.random().toString(36).substr(2, 9)}`;
 
         const getInitials = (name = '') => {
-            const parts = name.split(' ');
+            const parts = name.trim().split(' ');
             if (parts.length > 1 && parts[parts.length - 1]) {
                 return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
             }
@@ -57,14 +99,14 @@
         };
 
         const calculateSettlement = (trip) => {
-            if (!trip || trip.guests.length < 2) {
+            if (!trip || !trip.guests || trip.guests.length < 2) {
                 return { transactions: [] };
             }
             
             const { guests, expenses } = trip;
             const balances = guests.reduce((acc, guest) => ({ ...acc, [guest.id]: 0 }), {});
 
-            expenses.forEach(expense => {
+            (expenses || []).forEach(expense => {
                 const totalAmount = parseFloat(expense.amount);
                 if (balances[expense.paidById] !== undefined) {
                     balances[expense.paidById] += totalAmount;
@@ -87,7 +129,7 @@
                         });
                         break;
                     default: // 'equally'
-                        if (expense.splitWith.length > 0) {
+                        if (expense.splitWith && expense.splitWith.length > 0) {
                             const share = totalAmount / expense.splitWith.length;
                             expense.splitWith.forEach(guestId => {
                                 if (balances[guestId] !== undefined) {
@@ -114,7 +156,7 @@
                 const amountToSettle = Math.min(debtor.amount, creditor.amount);
 
                 if (amountToSettle > 0.01) {
-                     transactions.push({ from: debtor.id, to: creditor.id, amount: amountToSettle });
+                    transactions.push({ from: debtor.id, to: creditor.id, amount: amountToSettle });
                 }
                 debtor.amount -= amountToSettle;
                 creditor.amount -= amountToSettle;
@@ -169,6 +211,12 @@
                 <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
             </svg>
         );
+        
+        const ShareIcon = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+               <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12s-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.368a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
+            </svg>
+        );
 
         const ActivityIcon = () => (
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -178,7 +226,13 @@
 
         // --- Main App Component ---
         function App() {
-            // --- State Management ---
+            // --- Firebase State ---
+            const [db, setDb] = useState(null);
+            const [auth, setAuth] = useState(null);
+            const [userId, setUserId] = useState(null);
+            const [isFirebaseReady, setFirebaseReady] = useState(false);
+            
+            // --- App State ---
             const [trips, setTrips] = useState([]);
             const [activeTripId, setActiveTripId] = useState(null);
             const [expandedTripId, setExpandedTripId] = useState(null);
@@ -186,54 +240,96 @@
             const [isGuestModalOpen, setGuestModalOpen] = useState(false);
             const [isExpenseModalOpen, setExpenseModalOpen] = useState(false);
             const [isTripModalOpen, setTripModalOpen] = useState(false);
+            const [isJoinModalOpen, setJoinModalOpen] = useState(false);
             const [editingTrip, setEditingTrip] = useState(null);
             const [editingExpenseId, setEditingExpenseId] = useState(null);
             const [expandedSettlementIndex, setExpandedSettlementIndex] = useState(null);
             const [confirmAction, setConfirmAction] = useState(null);
             const [actionTargetId, setActionTargetId] = useState(null);
-            const [copiedTripId, setCopiedTripId] = useState(null);
+            const [copiedFeedback, setCopiedFeedback] = useState(null);
 
-            // --- Data Persistence using localStorage ---
+            // --- Firebase Initialization and Auth ---
             useEffect(() => {
-                try {
-                    const savedData = localStorage.getItem(APP_STORAGE_KEY);
-                    if (savedData) {
-                        const parsedData = JSON.parse(savedData);
-                        const sanitizedTrips = (parsedData.trips || []).map(trip => ({
-                            ...trip,
-                            paidSettlements: trip.paidSettlements || {},
-                            history: trip.history || [],
-                        }));
-                        setTrips(sanitizedTrips);
-                        setActiveTripId(parsedData.activeTripId || null);
+                const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+                
+                const app = initializeApp(firebaseConfig);
+                const authInstance = getAuth(app);
+                const dbInstance = getFirestore(app);
+
+                setAuth(authInstance);
+                setDb(dbInstance);
+
+                const unsubscribe = onAuthStateChanged(authInstance, async (user) => {
+                    if (user) {
+                        setUserId(user.uid);
+                        setFirebaseReady(true);
+                    } else {
+                        try {
+                           if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                                await signInWithCustomToken(authInstance, __initial_auth_token);
+                           } else {
+                                await signInAnonymously(authInstance);
+                           }
+                        } catch (error) {
+                            console.error("Firebase sign-in failed", error);
+                        }
                     }
-                } catch (error) {
-                    console.error("Failed to load data from localStorage", error);
-                }
-            }, []);
+                });
 
+                return () => unsubscribe();
+            }, []);
+            
+            // --- Firestore Data Subscription ---
             useEffect(() => {
-                try {
-                    const dataToSave = JSON.stringify({ trips, activeTripId });
-                    localStorage.setItem(APP_STORAGE_KEY, dataToSave);
-                } catch (error) {
-                    console.error("Failed to save data to localStorage", error);
-                }
-            }, [trips, activeTripId]);
+                if (!isFirebaseReady || !userId || !db) return;
+
+                const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                const tripsCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'trips');
+                const q = query(tripsCollectionRef, where("members", "array-contains", userId));
+
+                const unsubscribe = onSnapshot(q, (querySnapshot) => {
+                    const tripsData = querySnapshot.docs.map(doc => ({...doc.data(), id: doc.id }));
+                    setTrips(tripsData);
+                }, (error) => {
+                    console.error("Error fetching trips:", error);
+                });
+
+                return () => unsubscribe();
+            }, [isFirebaseReady, userId, db]);
+            
+            const getTripRef = useCallback((tripId) => {
+                if (!db || !tripId) return null;
+                const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                return doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripId);
+            }, [db]);
+
+            const getTripsCollectionRef = useCallback(() => {
+                if (!db) return null;
+                const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                return collection(db, 'artifacts', appId, 'public', 'data', 'trips');
+            }, [db]);
+            
+            const addLogToTrip = (trip, message) => {
+                const newLog = { id: generateId(), message, timestamp: new Date().toISOString() };
+                const updatedHistory = [newLog, ...(trip.history || [])];
+                return { ...trip, history: updatedHistory };
+            };
             
             // --- Handlers for Trips ---
-            const handleTripAction = (tripData) => {
+            const handleTripAction = async (tripData) => {
+                if (!userId) return;
+
                 if (editingTrip) { // Update existing trip
-                     const message = `The trip name was changed to "${tripData.name}".`;
-                     modifyActiveTrip(t => ({ ...t, name: tripData.name, date: tripData.date }), message);
+                    const tripRef = getTripRef(editingTrip.id);
+                    const updatedTrip = addLogToTrip(editingTrip, `The trip name was changed to "${tripData.name}".`);
+                    await updateDoc(tripRef, { name: tripData.name, date: tripData.date, history: updatedTrip.history });
                 } else { // Create new trip
-                    const newTrip = { id: generateId(), name: tripData.name, date: tripData.date, guests: [], expenses: [], paidSettlements: {}, history: [] };
-                    const message = `Trip "${newTrip.name}" was created.`;
-                    const newLog = { id: generateId(), message, timestamp: new Date().toISOString() };
-                    newTrip.history.unshift(newLog);
-                    
-                    setTrips(prev => [...prev, newTrip]);
-                    setActiveTripId(newTrip.id);
+                    const tripsCollectionRef = getTripsCollectionRef();
+                    const newTrip = { name: tripData.name, date: tripData.date, guests: [], expenses: [], paidSettlements: {}, history: [], members: [userId] };
+                    const finalTrip = addLogToTrip(newTrip, `Trip "${newTrip.name}" was created.`);
+                    const newDocRef = await addDoc(tripsCollectionRef, finalTrip);
+                    setActiveTripId(newDocRef.id);
                 }
                 setTripModalOpen(false);
                 setEditingTrip(null);
@@ -244,76 +340,93 @@
                 setTripModalOpen(true);
             };
 
-            const deleteTrip = (tripId) => {
-                setTrips(prev => prev.filter(t => t.id !== tripId));
-            };
-            
-            const modifyActiveTrip = (updater, activityMessage) => {
-                setTrips(prevTrips =>
-                    prevTrips.map(t => {
-                        if (t.id === activeTripId) {
-                            const updatedTrip = updater(t);
-                            if (activityMessage) {
-                                const newLog = {
-                                    id: generateId(),
-                                    message: activityMessage,
-                                    timestamp: new Date().toISOString()
-                                };
-                                updatedTrip.history = [newLog, ...(updatedTrip.history || [])];
-                            }
-                            return updatedTrip;
-                        }
-                        return t;
-                    })
-                );
-            };
-            
-            const handleTogglePaid = (tripId, settlementKey) => {
-                setTrips(prevTrips => prevTrips.map(trip => {
-                    if (trip.id === tripId) {
-                        const newPaidSettlements = { ...(trip.paidSettlements || {}) };
-                        if (newPaidSettlements[settlementKey]) {
-                            delete newPaidSettlements[settlementKey];
-                        } else {
-                            newPaidSettlements[settlementKey] = true;
-                        }
-                        return { ...trip, paidSettlements: newPaidSettlements };
-                    }
-                    return trip;
-                }));
+            const deleteTrip = async (tripId) => {
+                const tripRef = getTripRef(tripId);
+                await deleteDoc(tripRef);
+                if (activeTripId === tripId) {
+                    setActiveTripId(null);
+                }
             };
 
-            const fallbackCopyTextToClipboard = (text, tripId) => {
+            const handleJoinTrip = async (tripIdToJoin) => {
+                if (!userId || !tripIdToJoin.trim()) return;
+                const tripRef = getTripRef(tripIdToJoin.trim());
+                try {
+                    await updateDoc(tripRef, {
+                        members: arrayUnion(userId)
+                    });
+                    setJoinModalOpen(false);
+                } catch (error) {
+                    console.error("Error joining trip:", error);
+                    alert("Could not join trip. Please check the ID and try again.");
+                }
+            };
+            
+            const modifyTrip = useCallback(async (tripId, updates) => {
+                if (!tripId) return;
+                const tripRef = getTripRef(tripId);
+                await updateDoc(tripRef, updates);
+            }, [getTripRef]);
+
+            const handleTogglePaid = (tripId, settlementKey) => {
+                const trip = trips.find(t => t.id === tripId);
+                if (!trip) return;
+                const newPaidSettlements = { ...(trip.paidSettlements || {}) };
+                if (newPaidSettlements[settlementKey]) {
+                    delete newPaidSettlements[settlementKey];
+                } else {
+                    newPaidSettlements[settlementKey] = true;
+                }
+                modifyTrip(tripId, { paidSettlements: newPaidSettlements });
+            };
+
+            const showCopyFeedback = (id) => {
+                setCopiedFeedback(id);
+                setTimeout(() => setCopiedFeedback(null), 2000);
+            };
+
+            const fallbackCopyTextToClipboard = (text, id) => {
                 const textArea = document.createElement("textarea");
                 textArea.value = text;
-                
+                // Make the textarea out of viewport
                 textArea.style.position = 'fixed';
                 textArea.style.top = '-9999px';
                 textArea.style.left = '-9999px';
                 textArea.style.opacity = '0';
-
                 document.body.appendChild(textArea);
                 textArea.focus();
                 textArea.select();
-
                 try {
                     const successful = document.execCommand('copy');
                     if (successful) {
-                        setCopiedTripId(tripId);
-                        setTimeout(() => setCopiedTripId(null), 2000);
+                        showCopyFeedback(id);
                     }
                 } catch (err) {
                     console.error('Fallback copy failed', err);
                 }
-
                 document.body.removeChild(textArea);
+            };
+
+            const handleCopyText = (text, id) => {
+                // Modern async clipboard API
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(text)
+                        .then(() => showCopyFeedback(id))
+                        .catch(err => {
+                            console.warn('Clipboard API failed, falling back to execCommand.', err);
+                            fallbackCopyTextToClipboard(text, id);
+                        });
+                } else {
+                    // Fallback for older browsers
+                    fallbackCopyTextToClipboard(text, id);
+                }
             };
             
             const handleCopySummary = (trip) => {
                 const { transactions } = calculateSettlement(trip);
                 if (transactions.length === 0) return;
 
-                const tripGuestMap = trip.guests.reduce((map, guest) => ({...map, [guest.id]: guest.name}), {});
+                const tripGuestMap = (trip.guests || []).reduce((map, guest) => ({...map, [guest.id]: guest.name}), {});
 
                 let summaryText = `Settlement Summary for "${trip.name}":\n`;
                 transactions.forEach(t => {
@@ -322,30 +435,23 @@
                     const amount = t.amount.toFixed(2);
                     summaryText += `- ${fromName} owes ${toName}: ₹${amount}\n`;
                 });
-
-                if (navigator.clipboard && navigator.clipboard.writeText) {
-                    navigator.clipboard.writeText(summaryText).then(() => {
-                        setCopiedTripId(trip.id);
-                        setTimeout(() => setCopiedTripId(null), 2000);
-                    }).catch(() => {
-                        fallbackCopyTextToClipboard(summaryText, trip.id);
-                    });
-                } else {
-                    fallbackCopyTextToClipboard(summaryText, trip.id);
-                }
+                
+                handleCopyText(summaryText, `summary-${trip.id}`);
             };
 
-             const _performAddGuest = (name, message) => {
+            // --- Handlers for Guests & Expenses ---
+            const _performAddGuest = (name, message) => {
                 const newGuest = { id: generateId(), name };
                 const logMessage = message || `${name} was added to the trip.`;
-                modifyActiveTrip(trip => ({ ...trip, guests: [...trip.guests, newGuest] }), logMessage);
+                let updatedTrip = addLogToTrip(activeTrip, logMessage);
+                updatedTrip.guests.push(newGuest);
+                modifyTrip(activeTripId, { guests: updatedTrip.guests, history: updatedTrip.history });
             };
 
-            // --- Handlers for Guests & Expenses (now operate on the active trip) ---
             const addGuest = (name) => {
-                if (name && activeTrip && !activeTrip.guests.some(g => g.name === name)) {
-                    const potentialExpensesToUpdate = activeTrip.expenses.filter(exp =>
-                        exp.splitType === 'equally' && exp.splitWith.length === activeTrip.guests.length
+                if (name && activeTrip && !(activeTrip.guests || []).some(g => g.name === name)) {
+                    const potentialExpensesToUpdate = (activeTrip.expenses || []).filter(exp =>
+                        exp.splitType === 'equally' && exp.splitWith.length === (activeTrip.guests || []).length
                     );
 
                     if (potentialExpensesToUpdate.length > 0) {
@@ -361,25 +467,35 @@
                 const guestName = activeTrip?.guests.find(g => g.id === id)?.name;
                 if (!guestName) return;
 
-                const updater = trip => {
-                    const updatedExpenses = trip.expenses
-                        .filter(exp => exp.paidById !== id)
-                        .map(exp => ({ ...exp, splitWith: exp.splitWith.filter(guestId => guestId !== id) }))
-                        .filter(exp => exp.splitWith.length > 0);
-                    return { ...trip, guests: trip.guests.filter(g => g.id !== id), expenses: updatedExpenses, paidSettlements: {} };
-                };
-                modifyActiveTrip(updater, `${guestName} was removed from the trip.`);
+                const updatedGuests = activeTrip.guests.filter(g => g.id !== id);
+                const updatedExpenses = (activeTrip.expenses || [])
+                    .filter(exp => exp.paidById !== id)
+                    .map(exp => ({ ...exp, splitWith: exp.splitWith.filter(guestId => guestId !== id) }))
+                    .filter(exp => exp.splitWith.length > 0);
+                
+                let updatedTrip = addLogToTrip(activeTrip, `${guestName} was removed from the trip.`);
+
+                modifyTrip(activeTripId, { 
+                    guests: updatedGuests, 
+                    expenses: updatedExpenses, 
+                    paidSettlements: {},
+                    history: updatedTrip.history
+                });
             };
 
             const addExpense = (expense) => {
                 const payerName = activeTrip?.guests.find(g => g.id === expense.paidById)?.name || 'Someone';
                 const message = `${payerName} added "${expense.description}" (₹${expense.amount.toFixed(2)}).`;
-                modifyActiveTrip(trip => ({ ...trip, expenses: [...trip.expenses, { ...expense, id: generateId() }], paidSettlements: {} }), message);
+                let updatedTrip = addLogToTrip(activeTrip, message);
+                const newExpenses = [...(updatedTrip.expenses || []), { ...expense, id: generateId() }];
+                modifyTrip(activeTripId, { expenses: newExpenses, paidSettlements: {}, history: updatedTrip.history });
             };
             
             const updateExpense = (id, updatedData) => {
-                 const message = `"${updatedData.description}" was edited.`;
-                modifyActiveTrip(trip => ({ ...trip, expenses: trip.expenses.map(exp => (exp.id === id ? { ...exp, ...updatedData } : exp)), paidSettlements: {} }), message);
+                const message = `"${updatedData.description}" was edited.`;
+                let updatedTrip = addLogToTrip(activeTrip, message);
+                const newExpenses = updatedTrip.expenses.map(exp => (exp.id === id ? { ...exp, ...updatedData } : exp));
+                modifyTrip(activeTripId, { expenses: newExpenses, paidSettlements: {}, history: updatedTrip.history });
                 setEditingExpenseId(null);
             };
             
@@ -387,7 +503,9 @@
                 const expense = activeTrip?.expenses.find(e => e.id === id);
                 if (!expense) return;
                 const message = `"${expense.description}" was removed.`;
-                modifyActiveTrip(trip => ({...trip, expenses: trip.expenses.filter(exp => exp.id !== id), paidSettlements: {} }), message);
+                let updatedTrip = addLogToTrip(activeTrip, message);
+                const newExpenses = updatedTrip.expenses.filter(exp => exp.id !== id);
+                modifyTrip(activeTripId, { expenses: newExpenses, paidSettlements: {}, history: updatedTrip.history });
             };
 
             const handleModalClose = () => {
@@ -403,23 +521,25 @@
                     const { guestName, expensesToUpdate } = actionTargetId;
                     const newGuest = { id: generateId(), name: guestName };
                     const expenseIdsToUpdate = expensesToUpdate.map(exp => exp.id);
-                    const updater = trip => {
-                        const updatedGuests = [...trip.guests, newGuest];
-                        const updatedExpenses = trip.expenses.map(exp => {
-                            if (expenseIdsToUpdate.includes(exp.id)) {
-                                return { ...exp, splitWith: [...exp.splitWith, newGuest.id] };
-                            }
-                            return exp;
-                        });
-                        return { ...trip, guests: updatedGuests, expenses: updatedExpenses, paidSettlements: {} };
-                    };
+                    
+                    const updatedGuests = [...activeTrip.guests, newGuest];
+                    const updatedExpenses = activeTrip.expenses.map(exp => {
+                        if (expenseIdsToUpdate.includes(exp.id)) {
+                            return { ...exp, splitWith: [...exp.splitWith, newGuest.id] };
+                        }
+                        return exp;
+                    });
                     const message = `${guestName} was added and included in ${expensesToUpdate.length} past expense(s).`;
-                    modifyActiveTrip(updater, message);
+                    let updatedTrip = addLogToTrip(activeTrip, message);
+                    
+                    modifyTrip(activeTripId, { guests: updatedGuests, expenses: updatedExpenses, paidSettlements: {}, history: updatedTrip.history });
                 }
                 else if (confirmAction === 'removeAllGuests') {
-                    modifyActiveTrip(trip => ({ ...trip, guests: [], expenses: [], paidSettlements: {} }), 'All guests and expenses were removed.');
+                    let updatedTrip = addLogToTrip(activeTrip, 'All guests and expenses were removed.');
+                    modifyTrip(activeTripId, { guests: [], expenses: [], paidSettlements: {}, history: updatedTrip.history });
                 } else if (confirmAction === 'removeAllExpenses') {
-                    modifyActiveTrip(trip => ({ ...trip, expenses: [], paidSettlements: {} }), 'All expenses were removed.');
+                    let updatedTrip = addLogToTrip(activeTrip, 'All expenses were removed.');
+                    modifyTrip(activeTripId, { expenses: [], paidSettlements: {}, history: updatedTrip.history });
                 } else if (confirmAction === 'deleteTrip') {
                     deleteTrip(actionTargetId);
                 }
@@ -443,19 +563,19 @@
             const settlement = useMemo(() => calculateSettlement(activeTrip), [activeTrip]);
 
             const guestMap = useMemo(() => {
-                if (!activeTrip) return {};
+                if (!activeTrip || !activeTrip.guests) return {};
                 return activeTrip.guests.reduce((map, guest) => ({...map, [guest.id]: guest.name}), {});
             }, [activeTrip]);
 
             const guestSummaries = useMemo(() => {
-                if (!activeTrip) return {};
+                if (!activeTrip || !activeTrip.guests) return {};
             
                 const summaries = activeTrip.guests.reduce((acc, guest) => {
                     acc[guest.id] = { paid: 0, share: 0 };
                     return acc;
                 }, {});
             
-                activeTrip.expenses.forEach(expense => {
+                (activeTrip.expenses || []).forEach(expense => {
                     const totalAmount = parseFloat(expense.amount);
                     if (isNaN(totalAmount) || totalAmount <= 0) return;
             
@@ -480,7 +600,7 @@
                             });
                             break;
                         default: // 'equally'
-                            if (expense.splitWith.length > 0) {
+                            if (expense.splitWith && expense.splitWith.length > 0) {
                                 const share = totalAmount / expense.splitWith.length;
                                 expense.splitWith.forEach(guestId => {
                                     if (summaries[guestId]) {
@@ -496,7 +616,7 @@
             }, [activeTrip]);
 
             const categorySummary = useMemo(() => {
-                if (!activeTrip || activeTrip.expenses.length === 0) return null;
+                if (!activeTrip || !activeTrip.expenses || activeTrip.expenses.length === 0) return null;
 
                 const summary = activeTrip.expenses.reduce((acc, expense) => {
                     const category = expense.category || 'Other';
@@ -513,46 +633,35 @@
 
             }, [activeTrip]);
 
-            let modalTitle = '';
-            let modalBody = null;
-            let modalConfirmText = '';
-            let modalCancelText = 'Cancel';
-
-            if (confirmAction === 'deleteTrip') {
-                modalTitle = 'Delete Trip?';
-                modalBody = <p>Are you sure? This action will permanently delete this trip and all its data. This cannot be undone.</p>;
-                modalConfirmText = 'Yes, Delete Trip';
-            } else if (confirmAction === 'removeAllGuests') {
-                modalTitle = "Remove All Guests?";
-                modalBody = <p>Are you sure? This will remove all guests and permanently delete all associated expenses.</p>;
-                modalConfirmText = "Yes, Remove All Guests";
-            } else if (confirmAction === 'removeAllExpenses') {
-                modalTitle = "Remove All Expenses?";
-                modalBody = <p>Are you sure? This will permanently delete all expenses for this trip.</p>;
-                modalConfirmText = "Yes, Remove All Expenses";
-            } else if (confirmAction === 'includeNewGuest') {
-                const { guestName, expensesToUpdate } = actionTargetId || {};
-                modalTitle = `Add ${guestName} to past expenses?`;
-                modalBody = <p>You have {expensesToUpdate?.length} expense(s) split equally among all members. Do you want to add <strong>{guestName}</strong> to them?</p>;
-                modalConfirmText = 'Yes, Add to All';
-                modalCancelText = "No, Don't Add";
+            // --- Renders ---
+            if (!isFirebaseReady) {
+                return (
+                    <div className="flex justify-center items-center min-h-screen">
+                        <div className="loader"></div>
+                    </div>
+                );
             }
             
-            // --- Renders ---
             if (!activeTrip) {
                 return (
                     <div className="bg-slate-100 min-h-screen w-full font-sans text-slate-800 flex flex-col items-center p-4">
                         <div className="w-full max-w-2xl text-center">
                             <h1 className="text-4xl font-bold text-slate-900 mb-2">SplitWise Trips</h1>
                             <p className="text-lg text-slate-600 mb-8">Select a trip to manage or start a new one.</p>
-                            <button onClick={() => { setEditingTrip(null); setTripModalOpen(true); }} className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition-transform transform hover:scale-105 flex items-center justify-center gap-2 text-lg mx-auto">
-                                <PlusIcon />
-                                Add Trip/Event
-                            </button>
+                            <div className="flex justify-center gap-4">
+                               <button onClick={() => { setEditingTrip(null); setTripModalOpen(true); }} className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition-transform transform hover:scale-105 flex items-center justify-center gap-2 text-lg">
+                                    <PlusIcon />
+                                    Add Trip/Event
+                                </button>
+                                <button onClick={() => setJoinModalOpen(true)} className="bg-teal-500 hover:bg-teal-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition-transform transform hover:scale-105 flex items-center justify-center gap-2 text-lg">
+                                    <UserGroupIcon />
+                                    Join Trip
+                                </button>
+                            </div>
                             <div className="mt-8 space-y-4">
                                 {trips.length > 0 ? trips.map(trip => {
                                     const { transactions } = calculateSettlement(trip);
-                                    const tripGuestMap = trip.guests.reduce((map, guest) => ({...map, [guest.id]: guest.name}), {});
+                                    const tripGuestMap = (trip.guests || []).reduce((map, guest) => ({...map, [guest.id]: guest.name}), {});
 
                                     return (
                                         <div key={trip.id} className="bg-white rounded-xl shadow-md overflow-hidden transition-all duration-300 transform hover:scale-[1.02] hover:shadow-xl">
@@ -560,7 +669,7 @@
                                                 <div>
                                                     <h2 className="font-bold text-xl text-left">{trip.name}</h2>
                                                     <p className="text-sm text-slate-500 text-left">
-                                                        On: {new Date(trip.date).toLocaleDateString()} | {trip.guests.length} guests, {trip.expenses.length} expenses
+                                                        On: {new Date(trip.date).toLocaleDateString()} | {(trip.guests || []).length} guests, {(trip.expenses || []).length} expenses
                                                     </p>
                                                 </div>
                                                 <div className="flex items-center gap-2">
@@ -584,8 +693,7 @@
                                                                 onClick={(e) => { e.stopPropagation(); handleCopySummary(trip); }}
                                                                 className="flex items-center gap-1.5 text-sm font-semibold py-1 px-2 rounded-md bg-slate-200 hover:bg-slate-300 transition-colors"
                                                             >
-                                                                {copiedTripId === trip.id ? 'Copied!' : <CopyIcon/>}
-                                                                {copiedTripId === trip.id ? '' : 'Copy'}
+                                                                {copiedFeedback === `summary-${trip.id}` ? 'Copied!' : <><CopyIcon/> Copy</>}
                                                             </button>
                                                         )}
                                                     </div>
@@ -620,20 +728,20 @@
                                         </div>
                                     );
                                 }) : (
-                                    <p className="text-slate-500 pt-8">You haven't created any trips yet.</p>
+                                    <p className="text-slate-500 pt-8">You haven't created or joined any trips yet.</p>
                                 )}
                             </div>
                         </div>
                         <TripModal isOpen={isTripModalOpen} onClose={() => setTripModalOpen(false)} onTripAction={handleTripAction} tripToEdit={editingTrip} />
+                        <JoinTripModal isOpen={isJoinModalOpen} onClose={() => setJoinModalOpen(false)} onJoin={handleJoinTrip} />
                         <ConfirmationModal
-                            isOpen={!!confirmAction}
+                            isOpen={!!confirmAction && confirmAction === 'deleteTrip'}
                             onClose={handleModalClose}
                             onConfirm={handleConfirm}
-                            title={modalTitle}
-                            confirmButtonText={modalConfirmText}
-                            cancelButtonText={modalCancelText}
+                            title={'Delete Trip?'}
+                            confirmButtonText={'Yes, Delete Trip'}
                         >
-                            {modalBody}
+                            <p>Are you sure? This action will permanently delete this trip and all its data. This cannot be undone.</p>
                         </ConfirmationModal>
                     </div>
                 );
@@ -646,13 +754,25 @@
                         
                         {/* Header */}
                         <header className="py-4 border-b-2 border-slate-200">
-                            <div className="flex justify-between items-center">
+                            <div className="flex justify-between items-center flex-wrap gap-2">
                                  <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight flex items-center gap-4">
                                    <button onClick={() => setActiveTripId(null)} className="p-2 rounded-full hover:bg-slate-200 transition-colors">
                                         <BackArrowIcon />
                                    </button>
                                     SplitWise
                                 </h1>
+                                <div className="flex items-center gap-2 p-2 bg-slate-200 rounded-lg">
+                                    <ShareIcon />
+                                    <span className="text-sm font-semibold">Trip ID:</span>
+                                    <span className="font-mono text-sm bg-white px-2 py-1 rounded">{activeTripId}</span>
+                                    <button 
+                                        onClick={() => handleCopyText(activeTripId, `tripId-${activeTripId}`)} 
+                                        className="p-1 rounded-md hover:bg-slate-300 transition-colors"
+                                        title="Copy Trip ID"
+                                    >
+                                      {copiedFeedback === `tripId-${activeTripId}` ? <span className="text-sm font-bold text-green-600">Copied!</span> : <CopyIcon />}
+                                    </button>
+                                </div>
                             </div>
                             <h2 className="text-xl text-slate-600 font-semibold mt-2 pl-12">Trip: {activeTrip.name}</h2>
                         </header>
@@ -666,7 +786,7 @@
                                             <UserGroupIcon />
                                             Trip Guests
                                         </h2>
-                                        {activeTrip.guests.length > 0 && (
+                                        {(activeTrip.guests || []).length > 0 && (
                                             <button onClick={() => setConfirmAction('removeAllGuests')} className="text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-100 font-semibold text-sm flex items-center gap-1 transition-colors">
                                                 <TrashIcon />
                                                 Remove All
@@ -674,7 +794,7 @@
                                         )}
                                     </div>
                                     <ul className="space-y-3">
-                                        {activeTrip.guests.length > 0 ? activeTrip.guests.map(guest => {
+                                        {(activeTrip.guests || []).length > 0 ? activeTrip.guests.map(guest => {
                                             const summary = guestSummaries[guest.id] || { paid: 0, share: 0 };
                                             return (
                                                 <li key={guest.id} className="bg-slate-50 p-3 rounded-lg transition-shadow hover:shadow-md">
@@ -700,7 +820,7 @@
                                         Add Guest
                                     </button>
                                 </div>
-                                {activeTrip.guests.length > 1 && (
+                                {(activeTrip.guests || []).length > 1 && (
                                     <div className="bg-white p-5 rounded-xl shadow-md">
                                         <button onClick={handleOpenAddExpenseModal} className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105 flex items-center justify-center gap-2">
                                             <CurrencyDollarIcon/>
@@ -728,7 +848,7 @@
                                 <div className="bg-white p-5 rounded-xl shadow-md">
                                     <div className="flex justify-between items-center mb-4">
                                         <h2 className="text-xl font-semibold">Expenses</h2>
-                                        {activeTrip.expenses.length > 0 && (
+                                        {(activeTrip.expenses || []).length > 0 && (
                                             <button onClick={() => setConfirmAction('removeAllExpenses')} className="text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-100 font-semibold text-sm flex items-center gap-1 transition-colors">
                                                 <TrashIcon />
                                                 Remove All
@@ -736,7 +856,7 @@
                                         )}
                                     </div>
                                     <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
-                                        {activeTrip.expenses.length > 0 ? activeTrip.expenses.map(expense => (
+                                        {(activeTrip.expenses || []).length > 0 ? activeTrip.expenses.map(expense => (
                                             <div key={expense.id} className="bg-slate-50 p-4 rounded-lg flex items-start justify-between transition-shadow hover:shadow-md">
                                                 <div>
                                                     <div className="flex items-center gap-2">
@@ -762,11 +882,11 @@
                                                         <button onClick={() => removeExpense(expense.id)} className="text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-100 transition-colors">
                                                             <TrashIcon />
                                                         </button>
-                                                     </div>
+                                                    </div>
                                                 </div>
                                             </div>
                                         )) : <p className="text-slate-500">No expenses added yet.</p>}
-                                     </div>
+                                       </div>
                                 </div>
 
                                 {/* Settlement Summary */}
@@ -778,8 +898,7 @@
                                                 onClick={() => handleCopySummary(activeTrip)}
                                                 className="flex items-center gap-1.5 text-sm font-semibold py-1 px-2 rounded-md bg-slate-200 hover:bg-slate-300 transition-colors"
                                             >
-                                                {copiedTripId === activeTrip.id ? 'Copied!' : <CopyIcon/>}
-                                                {copiedTripId === activeTrip.id ? '' : 'Copy Summary'}
+                                                {copiedFeedback === `summary-${activeTrip.id}` ? 'Copied!' : <><CopyIcon/> Copy Summary</>}
                                             </button>
                                         </div>
                                         <ul className="space-y-3">
@@ -834,19 +953,29 @@
                         onClose={() => { setExpenseModalOpen(false); setEditingExpenseId(null); }} 
                         onAddExpense={addExpense} 
                         onUpdateExpense={updateExpense}
-                        guests={activeTrip.guests}
-                        expenseToEdit={activeTrip.expenses.find(exp => exp.id === editingExpenseId)}
+                        guests={activeTrip.guests || []}
+                        expenseToEdit={(activeTrip.expenses || []).find(exp => exp.id === editingExpenseId)}
                     />
                      <ConfirmationModal
-                        isOpen={!!confirmAction}
-                        onClose={handleModalClose}
-                        onConfirm={handleConfirm}
-                        title={modalTitle}
-                        confirmButtonText={modalConfirmText}
-                        cancelButtonText={modalCancelText}
-                    >
-                        {modalBody}
-                    </ConfirmationModal>
+                            isOpen={!!confirmAction && confirmAction !== 'deleteTrip'}
+                            onClose={handleModalClose}
+                            onConfirm={handleConfirm}
+                            title={
+                                confirmAction === 'removeAllGuests' ? "Remove All Guests?" :
+                                confirmAction === 'removeAllExpenses' ? "Remove All Expenses?" :
+                                confirmAction === 'includeNewGuest' ? `Add ${actionTargetId?.guestName} to past expenses?` : ''
+                            }
+                            confirmButtonText={
+                                confirmAction === 'removeAllGuests' ? "Yes, Remove All Guests" :
+                                confirmAction === 'removeAllExpenses' ? "Yes, Remove All Expenses" :
+                                confirmAction === 'includeNewGuest' ? 'Yes, Add to All' : ''
+                            }
+                             cancelButtonText={confirmAction === 'includeNewGuest' ? "No, Don't Add" : 'Cancel'}
+                        >
+                            {confirmAction === 'removeAllGuests' && <p>Are you sure? This will remove all guests and permanently delete all associated expenses.</p>}
+                            {confirmAction === 'removeAllExpenses' && <p>Are you sure? This will permanently delete all expenses for this trip.</p>}
+                            {confirmAction === 'includeNewGuest' && <p>You have {actionTargetId?.expensesToUpdate?.length} expense(s) split equally among all members. Do you want to add <strong>{actionTargetId?.guestName}</strong> to them?</p>}
+                        </ConfirmationModal>
                 </div>
             );
         }
@@ -869,7 +998,7 @@
             );
         }
 
-         function formatTimeAgo(isoString) {
+       function formatTimeAgo(isoString) {
             const date = new Date(isoString);
             const now = new Date();
             const seconds = Math.round((now - date) / 1000);
@@ -1032,6 +1161,62 @@
                             <div className="flex justify-end gap-4 mt-6">
                                 <button type="button" onClick={handleClose} className="py-2 px-4 bg-slate-200 hover:bg-slate-300 rounded-md font-semibold transition-colors">Cancel</button>
                                 <button type="submit" className="py-2 px-4 bg-blue-500 hover:bg-blue-600 text-white rounded-md font-semibold transition-colors">{tripToEdit ? 'Save Changes' : 'Start Trip'}</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            );
+        }
+        
+        function JoinTripModal({ isOpen, onClose, onJoin }) {
+            const [tripId, setTripId] = useState('');
+            const [isAnimating, setIsAnimating] = useState(false);
+
+            useEffect(() => {
+                if (isOpen) {
+                    setTripId('');
+                    requestAnimationFrame(() => setIsAnimating(true));
+                } else {
+                    setIsAnimating(false);
+                }
+            }, [isOpen]);
+
+            const handleClose = () => {
+                setIsAnimating(false);
+                setTimeout(onClose, 300);
+            };
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                if (tripId.trim()) {
+                    onJoin(tripId.trim());
+                }
+            };
+
+            if (!isOpen && !isAnimating) return null;
+
+            return (
+                <div 
+                    className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-black transition-opacity duration-300 ${isAnimating ? 'bg-opacity-50' : 'bg-opacity-0'}`}
+                    onClick={handleClose}
+                >
+                    <div 
+                        className={`bg-white rounded-lg shadow-xl w-full max-w-md p-6 transform transition-all duration-300 ${isAnimating ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <h2 className="text-2xl font-bold mb-4">Join an Existing Trip</h2>
+                        <form onSubmit={handleSubmit}>
+                            <input
+                                type="text"
+                                value={tripId}
+                                onChange={(e) => setTripId(e.target.value)}
+                                placeholder="Enter Trip ID"
+                                className="w-full p-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                autoFocus
+                            />
+                            <div className="flex justify-end gap-4 mt-6">
+                                <button type="button" onClick={handleClose} className="py-2 px-4 bg-slate-200 hover:bg-slate-300 rounded-md font-semibold transition-colors">Cancel</button>
+                                <button type="submit" className="py-2 px-4 bg-teal-500 hover:bg-teal-600 text-white rounded-md font-semibold transition-colors">Join Trip</button>
                             </div>
                         </form>
                     </div>
@@ -1311,7 +1496,6 @@
 
              const handleConfirm = () => {
                 onConfirm();
-                // handleClose(); // The confirm handler now closes the modal.
             };
 
             if (!isOpen && !isAnimating) return null;
@@ -1353,3 +1537,4 @@
     </script>
 </body>
 </html>
+
