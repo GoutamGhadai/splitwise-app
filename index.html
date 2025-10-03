@@ -45,10 +45,10 @@
 
         const getInitials = (name = '') => {
             const parts = name.split(' ');
-            if (parts.length > 1) {
-                return parts[0][0] + parts[parts.length - 1][0];
+            if (parts.length > 1 && parts[parts.length - 1]) {
+                return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
             }
-            return name.substring(0, 2);
+            return name.substring(0, 2).toUpperCase();
         };
 
         const generateAvatarColor = (name = '') => {
@@ -170,6 +170,12 @@
             </svg>
         );
 
+        const ActivityIcon = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+        );
+
         // --- Main App Component ---
         function App() {
             // --- State Management ---
@@ -195,7 +201,8 @@
                         const parsedData = JSON.parse(savedData);
                         const sanitizedTrips = (parsedData.trips || []).map(trip => ({
                             ...trip,
-                            paidSettlements: trip.paidSettlements || {}
+                            paidSettlements: trip.paidSettlements || {},
+                            history: trip.history || [],
                         }));
                         setTrips(sanitizedTrips);
                         setActiveTripId(parsedData.activeTripId || null);
@@ -217,9 +224,14 @@
             // --- Handlers for Trips ---
             const handleTripAction = (tripData) => {
                 if (editingTrip) { // Update existing trip
-                    setTrips(prev => prev.map(t => t.id === editingTrip.id ? { ...t, name: tripData.name, date: tripData.date } : t));
+                     const message = `The trip name was changed to "${tripData.name}".`;
+                     modifyActiveTrip(t => ({ ...t, name: tripData.name, date: tripData.date }), message);
                 } else { // Create new trip
-                    const newTrip = { id: generateId(), name: tripData.name, date: tripData.date, guests: [], expenses: [], paidSettlements: {} };
+                    const newTrip = { id: generateId(), name: tripData.name, date: tripData.date, guests: [], expenses: [], paidSettlements: {}, history: [] };
+                    const message = `Trip "${newTrip.name}" was created.`;
+                    const newLog = { id: generateId(), message, timestamp: new Date().toISOString() };
+                    newTrip.history.unshift(newLog);
+                    
                     setTrips(prev => [...prev, newTrip]);
                     setActiveTripId(newTrip.id);
                 }
@@ -236,9 +248,23 @@
                 setTrips(prev => prev.filter(t => t.id !== tripId));
             };
             
-            const modifyActiveTrip = (updater) => {
+            const modifyActiveTrip = (updater, activityMessage) => {
                 setTrips(prevTrips =>
-                    prevTrips.map(t => (t.id === activeTripId ? updater(t) : t))
+                    prevTrips.map(t => {
+                        if (t.id === activeTripId) {
+                            const updatedTrip = updater(t);
+                            if (activityMessage) {
+                                const newLog = {
+                                    id: generateId(),
+                                    message: activityMessage,
+                                    timestamp: new Date().toISOString()
+                                };
+                                updatedTrip.history = [newLog, ...(updatedTrip.history || [])];
+                            }
+                            return updatedTrip;
+                        }
+                        return t;
+                    })
                 );
             };
             
@@ -313,38 +339,48 @@
             const addGuest = (name) => {
                 if (name && activeTrip && !activeTrip.guests.some(g => g.name === name)) {
                     const newGuest = { id: generateId(), name };
-                    modifyActiveTrip(trip => ({ ...trip, guests: [...trip.guests, newGuest] }));
+                    modifyActiveTrip(trip => ({ ...trip, guests: [...trip.guests, newGuest] }), `${name} was added to the trip.`);
                 }
             };
             
             const removeGuest = (id) => {
-                modifyActiveTrip(trip => {
+                const guestName = activeTrip?.guests.find(g => g.id === id)?.name;
+                if (!guestName) return;
+
+                const updater = trip => {
                     const updatedExpenses = trip.expenses
                         .filter(exp => exp.paidById !== id)
                         .map(exp => ({ ...exp, splitWith: exp.splitWith.filter(guestId => guestId !== id) }))
                         .filter(exp => exp.splitWith.length > 0);
                     return { ...trip, guests: trip.guests.filter(g => g.id !== id), expenses: updatedExpenses, paidSettlements: {} };
-                });
+                };
+                modifyActiveTrip(updater, `${guestName} was removed from the trip.`);
             };
 
             const addExpense = (expense) => {
-                modifyActiveTrip(trip => ({ ...trip, expenses: [...trip.expenses, { ...expense, id: generateId() }], paidSettlements: {} }));
+                const payerName = activeTrip?.guests.find(g => g.id === expense.paidById)?.name || 'Someone';
+                const message = `${payerName} added "${expense.description}" (₹${expense.amount.toFixed(2)}).`;
+                modifyActiveTrip(trip => ({ ...trip, expenses: [...trip.expenses, { ...expense, id: generateId() }], paidSettlements: {} }), message);
             };
             
             const updateExpense = (id, updatedData) => {
-                modifyActiveTrip(trip => ({ ...trip, expenses: trip.expenses.map(exp => (exp.id === id ? { ...exp, ...updatedData } : exp)), paidSettlements: {} }));
+                 const message = `"${updatedData.description}" was edited.`;
+                modifyActiveTrip(trip => ({ ...trip, expenses: trip.expenses.map(exp => (exp.id === id ? { ...exp, ...updatedData } : exp)), paidSettlements: {} }), message);
                 setEditingExpenseId(null);
             };
             
             const removeExpense = (id) => {
-                modifyActiveTrip(trip => ({...trip, expenses: trip.expenses.filter(exp => exp.id !== id), paidSettlements: {} }));
+                const expense = activeTrip?.expenses.find(e => e.id === id);
+                if (!expense) return;
+                const message = `"${expense.description}" was removed.`;
+                modifyActiveTrip(trip => ({...trip, expenses: trip.expenses.filter(exp => exp.id !== id), paidSettlements: {} }), message);
             };
 
             const handleConfirm = () => {
                 if (confirmAction === 'removeAllGuests') {
-                    modifyActiveTrip(trip => ({ ...trip, guests: [], expenses: [], paidSettlements: {} }));
+                    modifyActiveTrip(trip => ({ ...trip, guests: [], expenses: [], paidSettlements: {} }), 'All guests and expenses were removed.');
                 } else if (confirmAction === 'removeAllExpenses') {
-                    modifyActiveTrip(trip => ({ ...trip, expenses: [], paidSettlements: {} }));
+                    modifyActiveTrip(trip => ({ ...trip, expenses: [], paidSettlements: {} }), 'All expenses were removed.');
                 } else if (confirmAction === 'deleteTrip') {
                     deleteTrip(actionTargetId);
                 }
@@ -712,6 +748,16 @@
                                         </ul>
                                     </div>
                                 )}
+                                 {/* Activity Feed */}
+                                {activeTrip.history && activeTrip.history.length > 0 && (
+                                    <div className="bg-white p-5 rounded-xl shadow-md">
+                                        <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                                            <ActivityIcon />
+                                            Activity History
+                                        </h2>
+                                        <ActivityFeed history={activeTrip.history} />
+                                    </div>
+                                )}
                             </div>
                         </main>
                     </div>
@@ -755,6 +801,38 @@
                 >
                     {getInitials(name)}
                 </div>
+            );
+        }
+
+         function formatTimeAgo(isoString) {
+            const date = new Date(isoString);
+            const now = new Date();
+            const seconds = Math.round((now - date) / 1000);
+            const minutes = Math.round(seconds / 60);
+            const hours = Math.round(minutes / 60);
+            const days = Math.round(hours / 24);
+
+            if (seconds < 60) return `${seconds}s ago`;
+            if (minutes < 60) return `${minutes}m ago`;
+            if (hours < 24) return `${hours}h ago`;
+            if (days < 7) return `${days}d ago`;
+            
+            return date.toLocaleDateString();
+        }
+
+        function ActivityFeed({ history }) {
+            return (
+                <ul className="space-y-3 max-h-60 overflow-y-auto pr-2">
+                    {history.map(log => (
+                        <li key={log.id} className="flex items-start gap-3 text-sm">
+                            <div className="w-1.5 h-1.5 bg-slate-300 rounded-full mt-1.5 flex-shrink-0"></div>
+                            <div>
+                                <p className="text-slate-700">{log.message}</p>
+                                <p className="text-xs text-slate-400">{formatTimeAgo(log.timestamp)}</p>
+                            </div>
+                        </li>
+                    ))}
+                </ul>
             );
         }
 
@@ -1122,4 +1200,3 @@
     </script>
 </body>
 </html>
-
