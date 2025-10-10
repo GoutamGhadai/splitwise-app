@@ -227,6 +227,19 @@
             </svg>
         );
 
+        const SuitcaseIcon = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 21l-1.5-1.5m2.5-1.5-1.5-1.5M6.75 6.75h10.5M6.75 6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 3.75V2.25a2.25 2.25 0 012.25-2.25h1.5A2.25 2.25 0 0115 2.25v1.5" />
+            </svg>
+        );
+
+        const ReceiptIcon = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+        );
+
         // --- Main App Component ---
         function App() {
             // --- State Management ---
@@ -256,7 +269,6 @@
                             history: trip.history || [],
                         }));
                         setTrips(sanitizedTrips);
-                        setActiveTripId(parsedData.activeTripId || null);
                     }
                 } catch (error) {
                     console.error("Failed to load data from localStorage", error);
@@ -265,12 +277,13 @@
 
             useEffect(() => {
                 try {
-                    const dataToSave = JSON.stringify({ trips, activeTripId });
+                    // Only save the trips data, not the active trip state, for a fresh start.
+                    const dataToSave = JSON.stringify({ trips });
                     localStorage.setItem(APP_STORAGE_KEY, dataToSave);
                 } catch (error) {
                     console.error("Failed to save data to localStorage", error);
                 }
-            }, [trips, activeTripId]);
+            }, [trips]);
             
             // --- Handlers for Trips ---
             const handleTripAction = (tripData) => {
@@ -610,14 +623,14 @@
                     <div className="min-h-screen w-full font-sans flex flex-col items-center justify-center p-4">
                         <div className="w-full max-w-2xl text-center">
                             <h1 className="text-5xl font-bold text-white mb-3 animate-fadeInUp">ShareFare</h1>
-                            <p className="text-lg text-slate-400 mb-10 animate-fadeInUp" style={{animationDelay: '0.2s'}}>Select a trip to manage or start a new one.</p>
+                            <p className="text-lg text-slate-300 mb-10 animate-fadeInUp" style={{animationDelay: '0.2s'}}>Select a trip to manage or start a new one.</p>
                             <div className="animate-fadeInUp" style={{animationDelay: '0.4s'}}>
-                                <button onClick={() => { setEditingTrip(null); setTripModalOpen(true); }} className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white font-bold py-3 px-6 rounded-lg shadow-lg shadow-cyan-500/30 transition-all transform hover:scale-105 hover:shadow-cyan-400/50 flex items-center justify-center gap-2 text-lg mx-auto">
+                                <button onClick={() => { setEditingTrip(null); setTripModalOpen(true); }} className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white font-bold py-3 px-6 rounded-lg shadow-lg shadow-cyan-500/30 transition-all transform hover:scale-105 hover:shadow-cyan-400/50 active:scale-95 flex items-center justify-center gap-2 text-lg mx-auto">
                                     <PlusIcon />
                                     Add Trip/Event
                                 </button>
                             </div>
-                            <div className="mt-12 space-y-4">
+                            <div className="mt-12 space-y-6">
                                 {trips.length > 0 ? trips.map((trip, index) => {
                                     const { transactions } = calculateSettlement(trip);
                                     const tripGuestMap = trip.guests.reduce((map, guest) => ({...map, [guest.id]: guest.name}), {});
@@ -627,18 +640,18 @@
                                             <div className="p-4 flex justify-between items-center cursor-pointer" onClick={() => setExpandedTripId(prevId => prevId === trip.id ? null : trip.id)}>
                                                 <div>
                                                     <h2 className="font-bold text-xl text-left text-white">{trip.name}</h2>
-                                                    <p className="text-sm text-slate-400 text-left">
+                                                    <p className="text-sm text-slate-300 text-left">
                                                         On: {new Date(trip.date).toLocaleDateString()} | {trip.guests.length} guests, {trip.expenses.length} expenses
                                                     </p>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <button onClick={(e) => { e.stopPropagation(); handleEditTrip(trip); }} className="text-slate-300 hover:text-cyan-400 p-2 rounded-full hover:bg-white/10 transition-colors">
+                                                    <button onClick={(e) => { e.stopPropagation(); handleEditTrip(trip); }} className="text-slate-300 hover:text-cyan-400 p-2 rounded-full hover:bg-white/10 transition-all active:scale-90">
                                                         <EditIcon />
                                                     </button>
-                                                    <button onClick={(e) => { e.stopPropagation(); setActionTargetId(trip.id); setConfirmAction('deleteTrip'); }} className="text-slate-300 hover:text-rose-400 p-2 rounded-full hover:bg-white/10 transition-colors">
+                                                    <button onClick={(e) => { e.stopPropagation(); setActionTargetId(trip.id); setConfirmAction('deleteTrip'); }} className="text-slate-300 hover:text-rose-400 p-2 rounded-full hover:bg-white/10 transition-all active:scale-90">
                                                         <TrashIcon />
                                                     </button>
-                                                    <button onClick={(e) => { e.stopPropagation(); setActiveTripId(trip.id); }} className="bg-slate-700 hover:bg-slate-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
+                                                    <button onClick={(e) => { e.stopPropagation(); setActiveTripId(trip.id); }} className="bg-slate-700 hover:bg-slate-600 text-white font-semibold py-2 px-4 rounded-lg transition-all active:scale-95">
                                                         Open
                                                     </button>
                                                 </div>
@@ -650,7 +663,7 @@
                                                         {transactions.length > 0 && (
                                                             <button 
                                                                 onClick={(e) => { e.stopPropagation(); handleCopySummary(trip); }}
-                                                                className="flex items-center gap-1.5 text-sm font-semibold py-1 px-2 rounded-md bg-slate-600 hover:bg-slate-500 transition-colors text-white"
+                                                                className="flex items-center gap-1.5 text-sm font-semibold py-1 px-2 rounded-md bg-slate-600 hover:bg-slate-500 transition-all active:scale-95 text-white"
                                                             >
                                                                 {copiedTripId === trip.id ? 'Copied!' : <CopyIcon/>}
                                                                 {copiedTripId === trip.id ? '' : 'Copy'}
@@ -672,7 +685,7 @@
                                                                         />
                                                                         <p className={`flex-1 truncate text-sm ${isPaid ? 'line-through text-slate-500' : ''}`}>
                                                                             <span className="font-bold text-cyan-400">{tripGuestMap[t.from]}</span>
-                                                                            <span className="text-slate-400"> owes </span>
+                                                                            <span className="text-slate-300"> owes </span>
                                                                             <span className="font-bold text-emerald-400">{tripGuestMap[t.to]}</span>
                                                                         </p>
                                                                         <span className={`font-bold text-md text-white whitespace-nowrap ${isPaid ? 'line-through text-slate-500' : ''}`}>₹{t.amount.toFixed(2)}</span>
@@ -681,14 +694,19 @@
                                                             })}
                                                         </ul>
                                                     ) : (
-                                                        <p className="text-slate-400 text-left">All settled up!</p>
+                                                        <p className="text-slate-300 text-left">All settled up!</p>
                                                     )}
                                                 </div>
                                             )}
                                         </div>
                                     );
                                 }) : (
-                                    <p className="text-slate-400 pt-8 animate-fadeInUp" style={{animationDelay: '0.6s'}}>You haven't created any trips yet.</p>
+                                    <div className="text-center pt-8 animate-fadeInUp" style={{animationDelay: '0.6s'}}>
+                                        <div className="flex justify-center mb-4">
+                                            <SuitcaseIcon />
+                                        </div>
+                                        <p className="text-slate-400">You haven't created any trips yet.</p>
+                                    </div>
                                 )}
                             </div>
                         </div>
@@ -716,7 +734,7 @@
                         <header className="py-4 animate-fadeInUp">
                             <div className="flex justify-between items-center">
                                  <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight flex items-center gap-3">
-                                   <button onClick={() => setActiveTripId(null)} className="p-2 rounded-full text-slate-400 hover:bg-white/10 hover:text-white transition-colors">
+                                   <button onClick={() => setActiveTripId(null)} className="p-2 rounded-full text-slate-400 hover:bg-white/10 hover:text-white transition-all active:scale-90">
                                        <BackArrowIcon />
                                    </button>
                                    <span className="bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-500">
@@ -724,7 +742,7 @@
                                    </span>
                                 </h1>
                             </div>
-                            <h2 className="text-xl text-slate-400 font-semibold mt-1 pl-12">{activeTrip.name}</h2>
+                            <h2 className="text-xl text-slate-300 font-semibold mt-1 pl-12">{activeTrip.name}</h2>
                         </header>
 
                         <main className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-6">
@@ -732,12 +750,12 @@
                             <div className="lg:col-span-1 space-y-6 animate-fadeInUp" style={{animationDelay: '0.2s', opacity: 0}}>
                                 <div className="glass-card p-5 rounded-2xl">
                                     <div className="flex justify-between items-center mb-4">
-                                        <h2 className="text-xl font-semibold flex items-center gap-2 text-white">
+                                        <h2 className="text-2xl font-bold flex items-center gap-2 text-white">
                                             <UserGroupIcon />
                                             Trip Guests
                                         </h2>
                                         {activeTrip.guests.length > 0 && (
-                                            <button onClick={() => setConfirmAction('removeAllGuests')} className="text-rose-400 hover:text-rose-300 p-1 rounded-full hover:bg-rose-500/20 font-semibold text-sm flex items-center gap-1 transition-colors">
+                                            <button onClick={() => setConfirmAction('removeAllGuests')} className="text-rose-400 hover:text-rose-300 p-1 rounded-full hover:bg-rose-500/20 font-semibold text-sm flex items-center gap-1 transition-all active:scale-90">
                                                 <TrashIcon />
                                             </button>
                                         )}
@@ -752,7 +770,7 @@
                                                             <Avatar name={guest.name} />
                                                             <span className="font-bold text-lg text-slate-200">{guest.name}</span>
                                                         </div>
-                                                        <button onClick={() => removeGuest(guest.id)} className="text-slate-400 hover:text-rose-400 p-1 rounded-full hover:bg-rose-500/20 flex-shrink-0 transition-colors">
+                                                        <button onClick={() => removeGuest(guest.id)} className="text-slate-400 hover:text-rose-400 p-1 rounded-full hover:bg-rose-500/20 flex-shrink-0 transition-all active:scale-90">
                                                             <TrashIcon />
                                                         </button>
                                                     </div>
@@ -762,16 +780,16 @@
                                                     </div>
                                                 </li>
                                             );
-                                        }) : <p className="text-slate-400">Add some guests to get started!</p>}
+                                        }) : <p className="text-slate-300">Add some guests to get started!</p>}
                                     </ul>
-                                    <button onClick={() => setGuestModalOpen(true)} className="w-full mt-4 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500 text-cyan-400 font-bold py-2 px-4 rounded-lg shadow-md transition-all transform hover:scale-105 flex items-center justify-center gap-2">
+                                    <button onClick={() => setGuestModalOpen(true)} className="w-full mt-4 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500 text-cyan-400 font-bold py-2 px-4 rounded-lg shadow-md transition-all transform hover:scale-105 active:scale-95 flex items-center justify-center gap-2">
                                         <PlusIcon />
                                         Add Guest
                                     </button>
                                 </div>
                                 {activeTrip.guests.length > 1 && (
                                     <div className="glass-card p-5 rounded-2xl">
-                                        <button onClick={handleOpenAddExpenseModal} className="w-full bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-400 hover:to-green-400 text-white font-bold py-3 px-4 rounded-lg shadow-lg shadow-emerald-500/30 transition-all transform hover:scale-105 hover:shadow-emerald-400/40 flex items-center justify-center gap-2">
+                                        <button onClick={handleOpenAddExpenseModal} className="w-full bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-400 hover:to-green-400 text-white font-bold py-3 px-4 rounded-lg shadow-lg shadow-emerald-500/30 transition-all transform hover:scale-105 hover:shadow-emerald-400/40 active:scale-95 flex items-center justify-center gap-2">
                                             <CurrencyDollarIcon/>
                                             Add Expense
                                         </button>
@@ -785,7 +803,7 @@
                                 {/* Spending Summary */}
                                 {categorySummary && (
                                     <div className="glass-card p-5 rounded-2xl">
-                                        <h2 className="text-xl font-semibold mb-4 text-white">Spending by Category</h2>
+                                        <h2 className="text-2xl font-bold mb-4 text-white">Spending by Category</h2>
                                         <div className="flex flex-col sm:flex-row items-center gap-4">
                                             <PieChart data={categorySummary} />
                                             <ChartLegend data={categorySummary} />
@@ -796,9 +814,9 @@
                                 {/* Expense List */}
                                 <div className="glass-card p-5 rounded-2xl">
                                     <div className="flex justify-between items-center mb-4">
-                                        <h2 className="text-xl font-semibold text-white">Expenses</h2>
+                                        <h2 className="text-2xl font-bold text-white">Expenses</h2>
                                         {activeTrip.expenses.length > 0 && (
-                                            <button onClick={() => setConfirmAction('removeAllExpenses')} className="text-rose-400 hover:text-rose-300 p-1 rounded-full hover:bg-rose-500/20 font-semibold text-sm flex items-center gap-1 transition-colors">
+                                            <button onClick={() => setConfirmAction('removeAllExpenses')} className="text-rose-400 hover:text-rose-300 p-1 rounded-full hover:bg-rose-500/20 font-semibold text-sm flex items-center gap-1 transition-all active:scale-90">
                                                 <TrashIcon />
                                             </button>
                                         )}
@@ -814,26 +832,34 @@
                                                         </span>
                                                         <p className="font-bold text-lg text-slate-200">{expense.description}</p>
                                                     </div>
-                                                    <p className="text-sm text-slate-400 pl-5">
-                                                        Paid by <span className="font-semibold text-slate-300">{guestMap[expense.paidById]}</span> on {new Date(expense.date).toLocaleDateString()}
+                                                    <p className="text-sm text-slate-300 pl-5">
+                                                        Paid by <span className="font-semibold text-slate-200">{guestMap[expense.paidById]}</span> on {new Date(expense.date).toLocaleDateString()}
                                                     </p>
-                                                    <p className="text-sm text-slate-500 mt-1 pl-5">
+                                                    <p className="text-sm text-slate-400 mt-1 pl-5">
                                                         {expense.splitType === 'equally' ? `Split equally with: ${expense.splitWith.map(id => guestMap[id]).join(', ')}` : `Split unequally`}
                                                     </p>
                                                 </div>
                                                 <div className="text-right flex-shrink-0 ml-4">
                                                     <p className="text-xl font-bold text-emerald-400">₹{parseFloat(expense.amount).toFixed(2)}</p>
                                                      <div className="flex items-center justify-end gap-2 mt-1">
-                                                        <button onClick={() => handleOpenEditExpenseModal(expense.id)} className="text-slate-400 hover:text-cyan-400 p-1 rounded-full hover:bg-cyan-500/20 transition-colors">
+                                                        <button onClick={() => handleOpenEditExpenseModal(expense.id)} className="text-slate-400 hover:text-cyan-400 p-1 rounded-full hover:bg-cyan-500/20 transition-all active:scale-90">
                                                             <EditIcon />
                                                         </button>
-                                                        <button onClick={() => removeExpense(expense.id)} className="text-slate-400 hover:text-rose-400 p-1 rounded-full hover:bg-rose-500/20 transition-colors">
+                                                        <button onClick={() => removeExpense(expense.id)} className="text-slate-400 hover:text-rose-400 p-1 rounded-full hover:bg-rose-500/20 transition-all active:scale-90">
                                                             <TrashIcon />
                                                         </button>
                                                      </div>
                                                 </div>
                                             </div>
-                                        )) : <p className="text-slate-400">No expenses added yet.</p>}
+                                        )) : (
+                                            <div className="text-center py-10">
+                                                <div className="flex justify-center mb-4">
+                                                    <ReceiptIcon />
+                                                </div>
+                                                <p className="text-slate-400">No expenses added yet.</p>
+                                                <p className="text-sm text-slate-500 mt-2">Add the first expense to see it here.</p>
+                                            </div>
+                                        )}
                                         </div>
                                 </div>
 
@@ -841,10 +867,10 @@
                                 {settlement.transactions.length > 0 && (
                                     <div className="glass-card p-5 rounded-2xl">
                                         <div className="flex justify-between items-center mb-4">
-                                            <h2 className="text-xl font-semibold text-white">How to Settle Up</h2>
+                                            <h2 className="text-2xl font-bold text-white">How to Settle Up</h2>
                                             <button
                                                 onClick={() => handleCopySummary(activeTrip)}
-                                                className="flex items-center gap-1.5 text-sm font-semibold py-1 px-2 rounded-md bg-slate-600 hover:bg-slate-500 transition-colors text-white"
+                                                className="flex items-center gap-1.5 text-sm font-semibold py-1 px-2 rounded-md bg-slate-600 hover:bg-slate-500 transition-all active:scale-95 text-white"
                                             >
                                                 {copiedTripId === activeTrip.id ? 'Copied!' : <CopyIcon/>}
                                                 {copiedTripId === activeTrip.id ? '' : 'Copy Summary'}
@@ -869,7 +895,7 @@
                                                             <Avatar name={guestMap[t.from]} size="sm" />
                                                             <p className={`${expandedSettlementIndex === index ? 'whitespace-normal' : 'truncate'} text-sm sm:text-base ${isPaid ? 'line-through text-slate-500' : 'text-slate-300'}`}>
                                                                 <span className="font-bold text-cyan-400">{guestMap[t.from]}</span>
-                                                                <span className="text-slate-400"> owes </span>
+                                                                <span className="text-slate-300"> owes </span>
                                                                 <span className="font-bold text-emerald-400">{guestMap[t.to]}</span>
                                                             </p>
                                                             <Avatar name={guestMap[t.to]} size="sm" />
@@ -884,7 +910,7 @@
                                  {/* Activity Feed */}
                                 {activeTrip.history && activeTrip.history.length > 0 && (
                                     <div className="glass-card p-5 rounded-2xl">
-                                        <h2 className="text-xl font-semibold mb-4 flex items-center gap-2 text-white">
+                                        <h2 className="text-2xl font-bold mb-4 flex items-center gap-2 text-white">
                                             <ActivityIcon />
                                             Activity History
                                         </h2>
@@ -961,7 +987,7 @@
                             <div className="w-1.5 h-1.5 bg-slate-500 rounded-full mt-1.5 flex-shrink-0"></div>
                             <div>
                                 <p className="text-slate-300">{log.message}</p>
-                                <p className="text-xs text-slate-500">{formatTimeAgo(log.timestamp)}</p>
+                                <p className="text-xs text-slate-400">{formatTimeAgo(log.timestamp)}</p>
                             </div>
                         </li>
                     ))}
@@ -1098,8 +1124,8 @@
                                 />
                             </div>
                             <div className="flex justify-end gap-4 mt-6">
-                                <button type="button" onClick={handleClose} className="py-2 px-4 bg-slate-700 hover:bg-slate-600 rounded-md font-semibold transition-colors text-white">Cancel</button>
-                                <button type="submit" className="py-2 px-4 bg-cyan-500 hover:bg-cyan-600 text-white rounded-md font-semibold transition-colors">{tripToEdit ? 'Save Changes' : 'Start Trip'}</button>
+                                <button type="button" onClick={handleClose} className="py-2 px-4 bg-slate-700 hover:bg-slate-600 rounded-md font-semibold transition-all active:scale-95 text-white">Cancel</button>
+                                <button type="submit" className="py-2 px-4 bg-cyan-500 hover:bg-cyan-600 text-white rounded-md font-semibold transition-all active:scale-95">{tripToEdit ? 'Save Changes' : 'Start Trip'}</button>
                             </div>
                         </form>
                     </div>
@@ -1155,8 +1181,8 @@
                                 autoFocus
                             />
                             <div className="flex justify-end gap-4 mt-6">
-                                <button type="button" onClick={handleClose} className="py-2 px-4 bg-slate-700 hover:bg-slate-600 rounded-md font-semibold transition-colors text-white">Cancel</button>
-                                <button type="submit" className="py-2 px-4 bg-cyan-500 hover:bg-cyan-600 text-white rounded-md font-semibold transition-colors">Add Guest</button>
+                                <button type="button" onClick={handleClose} className="py-2 px-4 bg-slate-700 hover:bg-slate-600 rounded-md font-semibold transition-all active:scale-95 text-white">Cancel</button>
+                                <button type="submit" className="py-2 px-4 bg-cyan-500 hover:bg-cyan-600 text-white rounded-md font-semibold transition-all active:scale-95">Add Guest</button>
                             </div>
                         </form>
                     </div>
@@ -1308,7 +1334,7 @@
                                 <label className="block font-semibold mb-2 text-slate-300">Split</label>
                                 <div className="flex items-center gap-4 mb-3 bg-slate-700/50 rounded-lg p-1">
                                     {['equally', 'amounts', 'percentages'].map(type => (
-                                        <button key={type} type="button" onClick={() => setSplitType(type)} className={`flex-1 py-1 px-2 text-sm rounded-md capitalize transition-colors ${splitType === type ? 'bg-cyan-500 text-white' : 'bg-transparent text-slate-300 hover:bg-slate-600'}`}>
+                                        <button key={type} type="button" onClick={() => setSplitType(type)} className={`flex-1 py-1 px-2 text-sm rounded-md capitalize transition-all active:scale-95 ${splitType === type ? 'bg-cyan-500 text-white' : 'bg-transparent text-slate-300 hover:bg-slate-600'}`}>
                                             {type}
                                         </button>
                                     ))}
@@ -1350,8 +1376,8 @@
                             </div>
                             {error && <p className="text-rose-400 text-sm font-semibold">{error}</p>}
                             <div className="flex justify-end gap-4 pt-4">
-                                <button type="button" onClick={handleClose} className="py-2 px-4 bg-slate-700 hover:bg-slate-600 rounded-md font-semibold transition-colors text-white">Cancel</button>
-                                <button type="submit" className="py-2 px-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-md font-semibold transition-colors">
+                                <button type="button" onClick={handleClose} className="py-2 px-4 bg-slate-700 hover:bg-slate-600 rounded-md font-semibold transition-all active:scale-95 text-white">Cancel</button>
+                                <button type="submit" className="py-2 px-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-md font-semibold transition-all active:scale-95">
                                     {expenseToEdit ? 'Save Changes' : 'Add Expense'}
                                 </button>
                             </div>
@@ -1398,13 +1424,13 @@
                         <div className="flex justify-end gap-4">
                             <button 
                                 onClick={handleClose} 
-                                className="py-2 px-5 bg-slate-700 hover:bg-slate-600 text-white rounded-md font-semibold transition-colors"
+                                className="py-2 px-5 bg-slate-700 hover:bg-slate-600 text-white rounded-md font-semibold transition-all active:scale-95"
                             >
                                 {cancelButtonText || 'Cancel'}
                             </button>
                             <button 
                                 onClick={handleConfirm} 
-                                className="py-2 px-5 bg-rose-500 hover:bg-rose-600 text-white rounded-md font-semibold transition-colors"
+                                className="py-2 px-5 bg-rose-500 hover:bg-rose-600 text-white rounded-md font-semibold transition-all active:scale-95"
                             >
                                 {confirmButtonText}
                             </button>
@@ -1421,3 +1447,4 @@
     </script>
 </body>
 </html>
+
