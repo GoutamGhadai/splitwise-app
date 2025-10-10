@@ -1398,48 +1398,56 @@
                             const popupStyle = {};
                             const highlighterStyle = {
                                 // Add some padding around the element
-                                top: `${rect.top - 4}px`,
-                                left: `${rect.left - 4}px`,
-                                width: `${rect.width + 8}px`,
-                                height: `${rect.height + 8}px`,
+                                top: `${rect.top - 5}px`,
+                                left: `${rect.left - 5}px`,
+                                width: `${rect.width + 10}px`,
+                                height: `${rect.height + 10}px`,
                             };
 
                             const padding = 16;
-                            // On small screens, the popup width is capped by CSS. Here, we calculate a width
-                            // to use for positioning logic that respects the viewport size.
+                            const gap = 15; // Space between element and popup
                             const logicalPopupWidth = Math.min(320, window.innerWidth - 2 * padding);
+                            const logicalPopupHeight = 180; // Estimated height for vertical positioning
 
                             switch (step.placement) {
                                 case 'bottom':
-                                    popupStyle.top = `${rect.bottom + 15}px`;
-                                    // Position it based on target center, but clamp to viewport edges.
-                                    let centeredLeftBottom = rect.left + rect.width / 2 - logicalPopupWidth / 2;
-                                    popupStyle.left = `${Math.max(padding, Math.min(centeredLeftBottom, window.innerWidth - logicalPopupWidth - padding))}px`;
+                                case 'top':
+                                    if (step.placement === 'bottom') {
+                                        popupStyle.top = `${rect.bottom + gap}px`;
+                                    } else { // 'top'
+                                        popupStyle.bottom = `${window.innerHeight - rect.top + gap}px`;
+                                    }
+                                    // Center popup horizontally, then clamp to viewport edges. This prevents overlap and boundary issues.
+                                    let centeredLeft = rect.left + (rect.width / 2) - (logicalPopupWidth / 2);
+                                    popupStyle.left = `${Math.max(padding, Math.min(centeredLeft, window.innerWidth - logicalPopupWidth - padding))}px`;
                                     break;
+                                
                                 case 'right':
-                                     popupStyle.top = `${rect.top}px`;
-                                     popupStyle.left = `${rect.right + 15}px`;
-                                     // If it overflows right, position it left of the target instead.
-                                     if (rect.right + 15 + logicalPopupWidth > window.innerWidth - padding) {
-                                         popupStyle.left = `${rect.left - logicalPopupWidth - 15}px`;
+                                     // Vertically center popup relative to the element, clamped to viewport.
+                                     let topPos = rect.top + (rect.height / 2) - (logicalPopupHeight / 2);
+                                     popupStyle.top = `${Math.max(padding, Math.min(topPos, window.innerHeight - logicalPopupHeight - padding))}px`;
+                                     
+                                     // Check if it fits on the right
+                                     if (rect.right + gap + logicalPopupWidth < window.innerWidth - padding) {
+                                         popupStyle.left = `${rect.right + gap}px`;
+                                     } 
+                                     // Otherwise, check if it fits on the left
+                                     else if (rect.left - logicalPopupWidth - gap > padding) {
+                                         popupStyle.left = `${rect.left - logicalPopupWidth - gap}px`;
+                                     } 
+                                     // If neither right nor left works, place it on the bottom as a fallback.
+                                     else {
+                                        popupStyle.top = `${rect.bottom + gap}px`;
+                                        let centeredLeftFallback = rect.left + (rect.width / 2) - (logicalPopupWidth / 2);
+                                        popupStyle.left = `${Math.max(padding, Math.min(centeredLeftFallback, window.innerWidth - logicalPopupWidth - padding))}px`;
                                      }
                                     break;
-                                case 'top':
-                                     popupStyle.bottom = `${window.innerHeight - rect.top + 15}px`;
-                                     // Position it based on target center, but clamp to viewport edges.
-                                     let centeredLeftTop = rect.left + rect.width / 2 - logicalPopupWidth / 2;
-                                     popupStyle.left = `${Math.max(padding, Math.min(centeredLeftTop, window.innerWidth - logicalPopupWidth - padding))}px`;
-                                    break;
+
                                 default: // center
                                     popupStyle.top = '50%';
                                     popupStyle.left = '50%';
                                     popupStyle.transform = 'translate(-50%, -50%)';
                                     highlighterStyle.display = 'none';
-                            }
-                            
-                             // A final check to ensure left is not negative or too far left.
-                            if (parseFloat(popupStyle.left) < padding) {
-                                popupStyle.left = `${padding}px`;
                             }
 
                             setStyles({ popupStyle, highlighterStyle });
