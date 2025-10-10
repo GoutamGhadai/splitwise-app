@@ -402,6 +402,7 @@
             const [isExpenseModalOpen, setExpenseModalOpen] = useState(false);
             const [isTripModalOpen, setTripModalOpen] = useState(false);
             const [isTourOpen, setIsTourOpen] = useState(false);
+            const [isUpdateExpensesModalOpen, setUpdateExpensesModalOpen] = useState(false);
             const [editingTrip, setEditingTrip] = useState(null);
             const [editingGuestId, setEditingGuestId] = useState(null);
             const [editingExpenseId, setEditingExpenseId] = useState(null);
@@ -605,12 +606,12 @@
             const addGuest = (name) => {
                 if (name && activeTrip && !activeTrip.guests.some(g => g.name === name)) {
                     const potentialExpensesToUpdate = activeTrip.expenses.filter(exp =>
-                        exp.splitType === 'equally' && exp.splitWith.length === activeTrip.guests.length
+                        exp.splitType === 'equally'
                     );
 
                     if (potentialExpensesToUpdate.length > 0) {
                         setActionTargetId({ guestName: name, expensesToUpdate: potentialExpensesToUpdate });
-                        setConfirmAction('includeNewGuest');
+                        setUpdateExpensesModalOpen(true);
                     } else {
                         _performAddGuest(name);
                     }
@@ -673,32 +674,46 @@
             };
 
             const handleModalClose = () => {
-                if (confirmAction === 'includeNewGuest') {
-                    _performAddGuest(actionTargetId.guestName);
-                }
                 setConfirmAction(null);
                 setActionTargetId(null);
             };
 
-            const handleConfirm = () => {
-                if (confirmAction === 'includeNewGuest') {
-                    const { guestName, expensesToUpdate } = actionTargetId;
-                    const newGuest = { id: generateId(), name: guestName };
-                    const expenseIdsToUpdate = expensesToUpdate.map(exp => exp.id);
-                    const updater = trip => {
-                        const updatedGuests = [...trip.guests, newGuest];
-                        const updatedExpenses = trip.expenses.map(exp => {
-                            if (expenseIdsToUpdate.includes(exp.id)) {
-                                return { ...exp, splitWith: [...exp.splitWith, newGuest.id] };
-                            }
-                            return exp;
-                        });
-                        return { ...trip, guests: updatedGuests, expenses: updatedExpenses, paidSettlements: {} };
-                    };
-                    const message = `${guestName} was added and included in ${expensesToUpdate.length} past expense(s).`;
-                    modifyActiveTrip(updater, message);
+            const handleConfirmUpdateExpenses = (selectedExpenseIds) => {
+                const { guestName } = actionTargetId;
+                const newGuest = { id: generateId(), name: guestName };
+                
+                const updater = trip => {
+                    const updatedGuests = [...trip.guests, newGuest];
+                    const updatedExpenses = trip.expenses.map(exp => {
+                        if (selectedExpenseIds.includes(exp.id)) {
+                            return { ...exp, splitWith: [...exp.splitWith, newGuest.id] };
+                        }
+                        return exp;
+                    });
+                    return { ...trip, guests: updatedGuests, expenses: updatedExpenses, paidSettlements: {} };
+                };
+
+                let message;
+                if (selectedExpenseIds.length > 0) {
+                    message = `${guestName} was added and included in ${selectedExpenseIds.length} past expense(s).`;
+                } else {
+                    message = `${guestName} was added to the trip.`;
                 }
-                else if (confirmAction === 'removeAllGuests') {
+                
+                modifyActiveTrip(updater, message);
+                setUpdateExpensesModalOpen(false);
+                setActionTargetId(null);
+            };
+
+            const handleCloseUpdateExpensesModal = () => {
+                const { guestName } = actionTargetId;
+                _performAddGuest(guestName);
+                setUpdateExpensesModalOpen(false);
+                setActionTargetId(null);
+            }
+
+            const handleConfirm = () => {
+                if (confirmAction === 'removeAllGuests') {
                     modifyActiveTrip(trip => ({ ...trip, guests: [], expenses: [], paidSettlements: {} }), 'All guests and expenses were removed.');
                 } else if (confirmAction === 'removeAllExpenses') {
                     modifyActiveTrip(trip => ({ ...trip, expenses: [], paidSettlements: {} }), 'All expenses were removed.');
@@ -834,13 +849,6 @@
                 modalBody = <p>Are you sure? This will permanently delete all expenses for this trip.</p>;
                 modalConfirmText = "Yes, Remove All Expenses";
                 isDestructive = true;
-            } else if (confirmAction === 'includeNewGuest') {
-                const { guestName, expensesToUpdate } = actionTargetId || {};
-                modalTitle = `Add ${guestName} to past expenses?`;
-                modalBody = <p>You have {expensesToUpdate?.length} expense(s) split equally among all members. Do you want to add <strong>{guestName}</strong> to them?</p>;
-                modalConfirmText = 'Yes, Add to All';
-                modalCancelText = "No, Don't Add";
-                isDestructive = false;
             }
             
             // --- Renders ---
@@ -1185,6 +1193,13 @@
                     
                     {/* Modals */}
                     <TourGuide isOpen={isTourOpen} onClose={handleCloseTour} />
+                    <UpdatePastExpensesModal
+                        isOpen={isUpdateExpensesModalOpen}
+                        onClose={handleCloseUpdateExpensesModal}
+                        onConfirm={handleConfirmUpdateExpenses}
+                        guestName={actionTargetId?.guestName}
+                        expensesToUpdate={actionTargetId?.expensesToUpdate || []}
+                    />
                     <GuestModal 
                         isOpen={isGuestModalOpen} 
                         onClose={() => { setGuestModalOpen(false); setEditingGuestId(null); }} 
@@ -1217,6 +1232,98 @@
         }
 
         // --- Child Components ---
+
+        function UpdatePastExpensesModal({ isOpen, onClose, onConfirm, guestName, expensesToUpdate }) {
+            const [selectedIds, setSelectedIds] = useState([]);
+            const [isAnimating, setIsAnimating] = useState(false);
+
+            useEffect(() => {
+                if (isOpen) {
+                    // Default to all selected
+                    setSelectedIds(expensesToUpdate.map(e => e.id));
+                    requestAnimationFrame(() => setIsAnimating(true));
+                } else {
+                    setIsAnimating(false);
+                }
+            }, [isOpen, expensesToUpdate]);
+
+            const handleClose = () => {
+                setIsAnimating(false);
+                setTimeout(onClose, 300);
+            };
+
+            const handleConfirm = () => {
+                onConfirm(selectedIds);
+            };
+
+            const toggleAll = () => {
+                if (selectedIds.length === expensesToUpdate.length) {
+                    setSelectedIds([]);
+                } else {
+                    setSelectedIds(expensesToUpdate.map(e => e.id));
+                }
+            };
+
+            const toggleOne = (id) => {
+                setSelectedIds(prev =>
+                    prev.includes(id) ? prev.filter(pId => pId !== id) : [...prev, id]
+                );
+            };
+
+            if (!isOpen && !isAnimating) return null;
+
+            return (
+                <div
+                    className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-black transition-opacity duration-300 ${isAnimating ? 'bg-opacity-70' : 'bg-opacity-0'}`}
+                    onClick={handleClose}
+                >
+                    <div
+                        className={`glass-modal rounded-xl shadow-xl w-full max-w-lg p-6 transform transition-all duration-300 ${isAnimating ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <h2 className="text-2xl font-bold mb-2 text-white">Update Past Expenses?</h2>
+                        <p className="text-slate-300 mb-4">
+                            <strong>{guestName}</strong> can be added to past equally-split expenses. Select which ones to include them in.
+                        </p>
+
+                        <div className="space-y-2 max-h-60 overflow-y-auto pr-2 border-y border-slate-700 py-3">
+                            <div className="flex items-center gap-3 p-2">
+                                <input
+                                    type="checkbox"
+                                    checked={selectedIds.length === expensesToUpdate.length && expensesToUpdate.length > 0}
+                                    onChange={toggleAll}
+                                    className="h-5 w-5 rounded bg-slate-600 border-slate-500 text-cyan-500 focus:ring-cyan-500"
+                                />
+                                <label className="font-bold text-white">Select All</label>
+                            </div>
+                            {expensesToUpdate.map(expense => (
+                                <div key={expense.id} className={`flex items-center gap-3 p-2 rounded-md transition-colors ${selectedIds.includes(expense.id) ? 'bg-cyan-500/20' : 'bg-slate-700/30'}`}>
+                                     <input
+                                        type="checkbox"
+                                        checked={selectedIds.includes(expense.id)}
+                                        onChange={() => toggleOne(expense.id)}
+                                        className="h-5 w-5 rounded bg-slate-600 border-slate-500 text-cyan-500 focus:ring-cyan-500"
+                                    />
+                                    <div className="flex-grow">
+                                        <p className="font-semibold text-slate-200">{expense.description}</p>
+                                        <p className="text-sm text-slate-400">₹{expense.amount.toFixed(2)} on {new Date(expense.date).toLocaleDateString()}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        
+                        <div className="flex justify-end gap-4 mt-6">
+                            <button type="button" onClick={handleClose} className="py-2 px-4 bg-slate-700 hover:bg-slate-600 rounded-md font-semibold transition-all active:scale-95 text-white">
+                                Just Add Guest
+                            </button>
+                            <button type="button" onClick={handleConfirm} className="py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md font-semibold transition-all active:scale-95 shadow-lg shadow-indigo-500/30">
+                                Update {selectedIds.length > 0 ? selectedIds.length : ''} Expense(s)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
 
         function Dashboard({ trip, guestSummaries }) {
             const dashboardStats = useMemo(() => {
@@ -2047,5 +2154,4 @@
     </script>
 </body>
 </html>
-
 
