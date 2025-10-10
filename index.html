@@ -107,7 +107,8 @@
         const { useState, useEffect, useMemo } = React;
 
         // --- Helper Functions & Constants ---
-        const APP_STORAGE_KEY = 'splitwiseAppData_v2';
+        const APP_STORAGE_KEY = 'shareFareAppData_v2';
+        const TOUR_STORAGE_KEY = 'shareFareTourCompleted_v1';
         const CATEGORIES = ['Food', 'Travel', 'Accommodation', 'Shopping', 'Activities', 'Other'];
         const CATEGORY_COLORS = {
             Food: '#f59e0b', // amber-500
@@ -307,6 +308,12 @@
                 } catch (error) {
                     console.error("Failed to load data from localStorage", error);
                 }
+
+                // Check if tour has been completed
+                const tourCompleted = localStorage.getItem(TOUR_STORAGE_KEY);
+                if (!tourCompleted) {
+                    setIsTourOpen(true);
+                }
             }, []);
 
             useEffect(() => {
@@ -318,6 +325,11 @@
                     console.error("Failed to save data to localStorage", error);
                 }
             }, [trips]);
+
+            const handleCloseTour = () => {
+                setIsTourOpen(false);
+                localStorage.setItem(TOUR_STORAGE_KEY, 'true');
+            };
             
             // --- Handlers for Trips ---
             const handleTripAction = (tripData) => {
@@ -754,7 +766,7 @@
                                 )}
                             </div>
                         </div>
-                        <TourGuide isOpen={isTourOpen} onClose={() => setIsTourOpen(false)} />
+                        <TourGuide isOpen={isTourOpen} onClose={handleCloseTour} />
                         <TripModal isOpen={isTripModalOpen} onClose={() => setTripModalOpen(false)} onTripAction={handleTripAction} tripToEdit={editingTrip} />
                         <ConfirmationModal
                             isOpen={!!confirmAction}
@@ -979,7 +991,7 @@
                     </div>
                     
                     {/* Modals */}
-                    <TourGuide isOpen={isTourOpen} onClose={() => setIsTourOpen(false)} />
+                    <TourGuide isOpen={isTourOpen} onClose={handleCloseTour} />
                     <GuestModal isOpen={isGuestModalOpen} onClose={() => setGuestModalOpen(false)} onAddGuest={addGuest} />
                     <ExpenseModal 
                         isOpen={isExpenseModalOpen} 
