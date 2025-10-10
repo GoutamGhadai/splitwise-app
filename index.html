@@ -267,6 +267,12 @@
             </svg>
         );
 
+        const QuestionMarkIcon = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+        );
+
         // --- Main App Component ---
         function App() {
             // --- State Management ---
@@ -277,6 +283,7 @@
             const [isGuestModalOpen, setGuestModalOpen] = useState(false);
             const [isExpenseModalOpen, setExpenseModalOpen] = useState(false);
             const [isTripModalOpen, setTripModalOpen] = useState(false);
+            const [isTourOpen, setIsTourOpen] = useState(false);
             const [editingTrip, setEditingTrip] = useState(null);
             const [editingExpenseId, setEditingExpenseId] = useState(null);
             const [expandedSettlementIndex, setExpandedSettlementIndex] = useState(null);
@@ -652,7 +659,12 @@
             // --- Renders ---
             if (!activeTrip) {
                 return (
-                    <div className="min-h-screen w-full font-sans flex flex-col items-center justify-center p-4">
+                    <div className="min-h-screen w-full font-sans flex flex-col items-center justify-center p-4 relative">
+                        <div className="absolute top-4 right-4">
+                            <button onClick={() => setIsTourOpen(true)} className="p-2 rounded-full text-slate-400 hover:bg-white/10 hover:text-white transition-all" title="Show Guide">
+                                <QuestionMarkIcon />
+                            </button>
+                        </div>
                         <div className="w-full max-w-2xl text-center">
                             <h1 className="text-5xl font-bold text-white mb-3 animate-fadeInUp">ShareFare</h1>
                             <p className="text-lg text-slate-300 mb-10 animate-fadeInUp" style={{animationDelay: '0.2s'}}>Select a trip to manage or start a new one.</p>
@@ -742,6 +754,7 @@
                                 )}
                             </div>
                         </div>
+                        <TourGuide isOpen={isTourOpen} onClose={() => setIsTourOpen(false)} />
                         <TripModal isOpen={isTripModalOpen} onClose={() => setTripModalOpen(false)} onTripAction={handleTripAction} tripToEdit={editingTrip} />
                         <ConfirmationModal
                             isOpen={!!confirmAction}
@@ -765,17 +778,29 @@
                         
                         {/* Header */}
                         <header className="py-4 animate-fadeInUp">
-                            <div className="flex justify-between items-center">
-                                 <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight flex items-center gap-3">
-                                   <button onClick={() => setActiveTripId(null)} className="p-2 rounded-full text-slate-400 hover:bg-white/10 hover:text-white transition-all active:scale-90">
+                             <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3 min-w-0">
+                                    <button onClick={() => setActiveTripId(null)} className="p-2 rounded-full text-slate-400 hover:bg-white/10 hover:text-white transition-all active:scale-90 flex-shrink-0">
                                        <BackArrowIcon />
                                    </button>
-                                   <span className="bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-500">
-                                     ShareFare
-                                   </span>
-                                </h1>
-                            </div>
-                            <h2 className="text-xl text-slate-300 font-semibold mt-1 pl-12">{activeTrip.name}</h2>
+                                   <div className="min-w-0">
+                                       <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight truncate" title={activeTrip.name}>
+                                           {activeTrip.name}
+                                       </h1>
+                                       <p className="text-sm text-slate-400">
+                                            On: {new Date(activeTrip.date).toLocaleDateString()}
+                                       </p>
+                                   </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-sm font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-500 hidden sm:block">
+                                        ShareFare
+                                    </span>
+                                    <button onClick={() => setIsTourOpen(true)} className="p-2 rounded-full text-slate-400 hover:bg-white/10 hover:text-white transition-all" title="Show Guide">
+                                        <QuestionMarkIcon />
+                                    </button>
+                                </div>
+                             </div>
                         </header>
 
                         <main className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-6">
@@ -954,6 +979,7 @@
                     </div>
                     
                     {/* Modals */}
+                    <TourGuide isOpen={isTourOpen} onClose={() => setIsTourOpen(false)} />
                     <GuestModal isOpen={isGuestModalOpen} onClose={() => setGuestModalOpen(false)} onAddGuest={addGuest} />
                     <ExpenseModal 
                         isOpen={isExpenseModalOpen} 
@@ -979,6 +1005,109 @@
         }
 
         // --- Child Components ---
+
+        function TourGuide({ isOpen, onClose }) {
+            const [currentStep, setCurrentStep] = useState(0);
+            const [isAnimating, setIsAnimating] = useState(false);
+
+            const tourSteps = [
+                {
+                    title: "Welcome to ShareFare!",
+                    content: "This quick guide will walk you through the main features. Let's get started with splitting expenses effortlessly."
+                },
+                {
+                    title: "Step 1: Create a Trip",
+                    content: "Everything starts with a trip or event. Click the 'Add Trip/Event' button on the main screen to create a new group for your expenses. Give it a name and a date."
+                },
+                {
+                    title: "Step 2: Add Your Guests",
+                    content: "Once you open a trip, you can start adding the people you'll be sharing costs with. Just click 'Add Guest' and type in their name."
+                },
+                {
+                    title: "Step 3: Log Your Expenses",
+                    content: "Use the 'Quick Add' form for simple, equally-split expenses. For more complex splits (by amount, percentage, or with specific people), click 'More Options...' to open the detailed expense form."
+                },
+                {
+                    title: "Step 4: Settle Up Automatically",
+                    content: "ShareFare does the hard work for you! The 'How to Settle Up' section shows the simplest way for everyone to pay each other back. No more complicated math!"
+                },
+                {
+                    title: "You're All Set!",
+                    content: "That's it! You're ready to manage your group expenses like a pro. You can revisit this guide anytime by clicking the question mark icon."
+                }
+            ];
+
+            useEffect(() => {
+                if (isOpen) {
+                    setCurrentStep(0);
+                    requestAnimationFrame(() => setIsAnimating(true));
+                } else {
+                    setIsAnimating(false);
+                }
+            }, [isOpen]);
+
+            const handleClose = () => {
+                setIsAnimating(false);
+                setTimeout(onClose, 300);
+            };
+
+            const handleNext = () => {
+                if (currentStep < tourSteps.length - 1) {
+                    setCurrentStep(currentStep + 1);
+                } else {
+                    handleClose();
+                }
+            };
+
+            const handlePrev = () => {
+                if (currentStep > 0) {
+                    setCurrentStep(currentStep - 1);
+                }
+            };
+            
+            if (!isOpen && !isAnimating) return null;
+
+            const step = tourSteps[currentStep];
+
+            return (
+                 <div 
+                    className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-black transition-opacity duration-300 ${isAnimating ? 'bg-opacity-70' : 'bg-opacity-0'}`}
+                    onClick={handleClose}
+                >
+                    <div 
+                        className={`glass-modal rounded-xl shadow-xl w-full max-w-md p-6 transform transition-all duration-300 ${isAnimating ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <div className="text-center">
+                            <h2 className="text-2xl font-bold mb-2 text-white">{step.title}</h2>
+                            <p className="text-slate-300 mb-6">{step.content}</p>
+                        </div>
+
+                        <div className="flex justify-center items-center gap-2 mb-6">
+                            {tourSteps.map((_, index) => (
+                                <div key={index} className={`w-2 h-2 rounded-full transition-all ${index === currentStep ? 'bg-cyan-400 scale-125' : 'bg-slate-600'}`}></div>
+                            ))}
+                        </div>
+                        
+                        <div className="flex justify-between items-center">
+                             <button 
+                                onClick={handlePrev} 
+                                className={`py-2 px-5 bg-slate-700 hover:bg-slate-600 text-white rounded-md font-semibold transition-all active:scale-95 ${currentStep === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                disabled={currentStep === 0}
+                            >
+                                Prev
+                            </button>
+                             <button 
+                                onClick={handleNext} 
+                                className="py-2 px-5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md font-semibold transition-all active:scale-95 shadow-lg shadow-indigo-500/30"
+                            >
+                                {currentStep === tourSteps.length - 1 ? 'Finish' : 'Next'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )
+        }
 
         function QuickAddExpense({ guests, onQuickAdd, onOpenDetailedModal }) {
             const [description, setDescription] = useState('');
