@@ -821,12 +821,11 @@
                                     </button>
                                 </div>
                                 {activeTrip.guests.length > 1 && (
-                                    <div className="glass-card p-5 rounded-2xl">
-                                        <button onClick={handleOpenAddExpenseModal} className="w-full bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-400 hover:to-green-400 text-white font-bold py-3 px-4 rounded-lg shadow-lg shadow-emerald-500/30 transition-all transform hover:scale-105 hover:shadow-emerald-400/40 active:scale-95 flex items-center justify-center gap-2">
-                                            <CurrencyDollarIcon/>
-                                            Add Expense
-                                        </button>
-                                    </div>
+                                    <QuickAddExpense 
+                                        guests={activeTrip.guests}
+                                        onQuickAdd={addExpense}
+                                        onOpenDetailedModal={handleOpenAddExpenseModal}
+                                    />
                                 )}
                             </div>
 
@@ -980,6 +979,84 @@
         }
 
         // --- Child Components ---
+
+        function QuickAddExpense({ guests, onQuickAdd, onOpenDetailedModal }) {
+            const [description, setDescription] = useState('');
+            const [amount, setAmount] = useState('');
+            const [paidById, setPaidById] = useState(guests.length > 0 ? guests[0].id : '');
+            const [error, setError] = useState('');
+
+            useEffect(() => {
+                if (guests.length > 0) {
+                    setPaidById(guests[0].id);
+                }
+            }, [guests]);
+
+            const handleQuickAdd = () => {
+                const numAmount = parseFloat(amount);
+                if (!description.trim()) { 
+                    setError('Description is required.'); 
+                    return; 
+                }
+                if (isNaN(numAmount) || numAmount <= 0) { 
+                    setError('A valid amount is required.'); 
+                    return; 
+                }
+
+                const expenseData = {
+                    description: description.trim(),
+                    amount: numAmount,
+                    date: new Date().toISOString().split('T')[0],
+                    paidById,
+                    splitWith: guests.map(g => g.id),
+                    category: 'Other',
+                    splitType: 'equally',
+                    splitDetails: {},
+                };
+
+                onQuickAdd(expenseData);
+                // Reset form
+                setDescription('');
+                setAmount('');
+                setError('');
+            };
+
+            return (
+                <div className="glass-card p-5 rounded-2xl">
+                    <h3 className="text-xl font-bold text-white mb-3">Quick Add Expense</h3>
+                    <div className="space-y-3">
+                        <input
+                            type="text"
+                            value={description}
+                            onChange={e => setDescription(e.target.value)}
+                            placeholder="Expense Description"
+                            className="w-full p-2 bg-slate-700/50 border border-slate-600 rounded-md text-white focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
+                        />
+                        <div className="grid grid-cols-2 gap-2">
+                             <input
+                                type="number"
+                                value={amount}
+                                onChange={e => setAmount(e.target.value)}
+                                placeholder="Amount (₹)"
+                                className="w-full p-2 bg-slate-700/50 border border-slate-600 rounded-md text-white focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
+                            />
+                             <select value={paidById} onChange={e => setPaidById(e.target.value)} className="w-full p-2 bg-slate-700/50 border border-slate-600 rounded-md text-white focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500">
+                                {guests.map(g => <option key={g.id} value={g.id}>{g.name} paid</option>)}
+                            </select>
+                        </div>
+                        {error && <p className="text-xs text-rose-400">{error}</p>}
+                        <div className="flex gap-2 pt-2">
+                             <button onClick={handleQuickAdd} className="w-full bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-400 hover:to-green-400 text-white font-bold py-2 px-3 rounded-lg shadow-lg shadow-emerald-500/30 transition-all transform hover:scale-105 active:scale-95 flex items-center justify-center gap-2 text-sm">
+                                Add
+                            </button>
+                             <button onClick={onOpenDetailedModal} className="w-full bg-slate-600 hover:bg-slate-500 text-white font-bold py-2 px-3 rounded-lg transition-all transform hover:scale-105 active:scale-95 flex items-center justify-center gap-2 text-sm">
+                                More Options...
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
 
         function Avatar({ name, size = 'md' }) {
             const sizeClasses = {
