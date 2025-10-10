@@ -12,6 +12,8 @@
         body {
             font-family: 'Inter', sans-serif;
             background-color: #020617; /* slate-950 */
+            color: #e2e8f0; /* slate-200 */
+            transition: background-color 0.3s ease, color 0.3s ease;
         }
         
         #bg-pattern {
@@ -23,6 +25,7 @@
             background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,0.05) 1px, transparent 0);
             background-size: 2rem 2rem;
             z-index: -2;
+            transition: background-image 0.3s ease;
         }
         #bg-gradient {
             position: fixed;
@@ -33,6 +36,7 @@
             background: radial-gradient(circle at center, rgba(56, 189, 248, 0.1), rgba(16, 185, 129, 0.1), transparent 40%);
             animation: rotate-gradient 25s linear infinite;
             z-index: -1;
+            transition: opacity 0.3s ease;
         }
 
         @keyframes rotate-gradient {
@@ -73,6 +77,81 @@
         ::-webkit-scrollbar-thumb:hover {
             background: rgba(255, 255, 255, 0.3);
         }
+
+        /* Light Theme */
+        body.light {
+            background-color: #f1f5f9; /* slate-100 */
+            color: #1e293b; /* slate-800 */
+        }
+        .light #bg-pattern {
+            background-image: radial-gradient(circle at 1px 1px, rgba(0,0,0,0.04) 1px, transparent 0);
+        }
+        .light #bg-gradient {
+            opacity: 0;
+        }
+        .light .glass-card {
+            background: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.07);
+        }
+         .light .glass-card:hover {
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1), 0 0 10px rgba(56, 189, 248, 0.1);
+        }
+        .light .glass-modal {
+            background: rgba(248, 250, 252, 0.8);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+        }
+        .light ::-webkit-scrollbar-track { background: rgba(0,0,0,0.05); }
+        .light ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); }
+        .light ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.3); }
+
+        /* Light theme text overrides */
+        .light .text-white { color: #0f172a; }
+        .light h1, .light h2, .light h3, .light .font-bold { color: #0f172a; }
+        .light .text-slate-200 { color: #334155; }
+        .light .text-slate-300 { color: #475569; }
+        .light .text-slate-400 { color: #64748b; }
+        .light .text-slate-500 { color: #64748b; }
+
+        /* Light theme component overrides */
+        .light input, .light select {
+            background-color: rgba(226, 232, 240, 0.5); /* slate-200/50 */
+            border-color: #cbd5e1; /* slate-300 */
+            color: #0f172a;
+        }
+        .light .bg-slate-900\/40 { background-color: rgba(226, 232, 240, 0.5); }
+        .light .hover\:bg-slate-900\/80:hover { background-color: rgba(203, 213, 225, 0.7); }
+        .light .bg-slate-700\/50 { background-color: rgba(226, 232, 240, 0.8); }
+        .light .border-white\/10 { border-color: #e2e8f0; }
+        .light .bg-black\/20 { background-color: rgba(255,255,255,0.2); }
+
+        .light button.bg-slate-700 { background-color: #e2e8f0; color: #1e293b; }
+        .light button.hover\:bg-slate-600:hover { background-color: #cbd5e1; }
+        .light button.bg-slate-600 { background-color: #e2e8f0; color: #1e293b; }
+        .light button.hover\:bg-slate-500:hover { background-color: #cbd5e1; }
+
+        .light .text-slate-400.hover\:bg-white\/10:hover { background-color: rgba(0,0,0,0.05); }
+        .light .text-slate-300.hover\:bg-white\/10:hover { background-color: rgba(0,0,0,0.05); }
+
+        .light .bg-cyan-500\/20 { background-color: rgba(6, 182, 212, 0.1); }
+        .light .text-cyan-400 { color: #0891b2; }
+
+        .light .bg-emerald-500\/20 { background-color: rgba(16, 185, 129, 0.1); }
+        .light .text-emerald-400 { color: #059669; }
+
+        .light .bg-rose-500\/20 { background-color: rgba(244, 63, 94, 0.1); }
+        .light .text-rose-400 { color: #e11d48; }
+
+        .light .bg-amber-500\/20 { background-color: rgba(245, 158, 11, 0.1); }
+        .light .text-amber-400 { color: #d97706; }
+        
+        .light .bg-blue-500\/20 { background-color: rgba(59, 130, 246, 0.1); }
+        .light .text-blue-400 { color: #2563eb; }
+
         /* Animation */
         @keyframes fadeInUp {
             from {
@@ -109,6 +188,7 @@
         // --- Helper Functions & Constants ---
         const APP_STORAGE_KEY = 'shareFareAppData_v2';
         const TOUR_STORAGE_KEY = 'shareFareTourCompleted_v1';
+        const THEME_STORAGE_KEY = 'shareFareTheme_v1';
         const CATEGORIES = ['Food', 'Travel', 'Accommodation', 'Shopping', 'Activities', 'Other'];
         const CATEGORY_COLORS = {
             Food: '#f59e0b', // amber-500
@@ -274,6 +354,18 @@
             </svg>
         );
 
+        const SunIcon = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />
+            </svg>
+        );
+
+        const MoonIcon = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" />
+            </svg>
+        );
+
         const ChartBarIcon = () => (
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" >
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
@@ -304,6 +396,7 @@
             const [trips, setTrips] = useState([]);
             const [activeTripId, setActiveTripId] = useState(null);
             const [expandedTripId, setExpandedTripId] = useState(null);
+            const [theme, setTheme] = useState('dark');
             
             const [isGuestModalOpen, setGuestModalOpen] = useState(false);
             const [isExpenseModalOpen, setExpenseModalOpen] = useState(false);
@@ -316,6 +409,23 @@
             const [confirmAction, setConfirmAction] = useState(null);
             const [actionTargetId, setActionTargetId] = useState(null);
             const [copiedTripId, setCopiedTripId] = useState(null);
+
+            // --- Theme Management ---
+            useEffect(() => {
+                const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+                const prefersLight = window.matchMedia('(prefers-color-scheme: light)').matches;
+                setTheme(savedTheme || (prefersLight ? 'light' : 'dark'));
+            }, []);
+
+            useEffect(() => {
+                document.body.className = '';
+                document.body.classList.add(theme);
+                localStorage.setItem(THEME_STORAGE_KEY, theme);
+            }, [theme]);
+
+            const toggleTheme = () => {
+                setTheme(prevTheme => prevTheme === 'dark' ? 'light' : 'dark');
+            };
 
             // --- Data Persistence using localStorage ---
             useEffect(() => {
@@ -737,7 +847,10 @@
             if (!activeTrip) {
                 return (
                     <div className="min-h-screen w-full font-sans flex flex-col items-center justify-center p-4 relative">
-                        <div className="absolute top-4 right-4">
+                        <div className="absolute top-4 right-4 flex items-center gap-2">
+                            <button onClick={toggleTheme} className="p-2 rounded-full text-slate-400 hover:bg-white/10 hover:text-white transition-all" title="Toggle Theme">
+                                {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+                            </button>
                             <button onClick={() => setIsTourOpen(true)} className="p-2 rounded-full text-slate-400 hover:bg-white/10 hover:text-white transition-all" title="Show Guide">
                                 <QuestionMarkIcon />
                             </button>
@@ -873,6 +986,9 @@
                                     <span className="text-sm font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-500 hidden sm:block">
                                         ShareFare
                                     </span>
+                                    <button onClick={toggleTheme} className="p-2 rounded-full text-slate-400 hover:bg-white/10 hover:text-white transition-all" title="Toggle Theme">
+                                        {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+                                    </button>
                                     <button onClick={() => setIsTourOpen(true)} className="p-2 rounded-full text-slate-400 hover:bg-white/10 hover:text-white transition-all" title="Show Guide">
                                         <QuestionMarkIcon />
                                     </button>
@@ -1931,4 +2047,5 @@
     </script>
 </body>
 </html>
+
 
