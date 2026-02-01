@@ -354,6 +354,12 @@
             </svg>
         );
 
+        const ArrowPathIcon = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+            </svg>
+        );
+
         const SunIcon = () => (
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />
@@ -397,11 +403,13 @@
             const [activeTripId, setActiveTripId] = useState(null);
             const [expandedTripId, setExpandedTripId] = useState(null);
             const [theme, setTheme] = useState('light');
+            const [filterPaidBy, setFilterPaidBy] = useState('All');
             
             const [isGuestModalOpen, setGuestModalOpen] = useState(false);
             const [isExpenseModalOpen, setExpenseModalOpen] = useState(false);
             const [isTripModalOpen, setTripModalOpen] = useState(false);
             const [isTourOpen, setIsTourOpen] = useState(false);
+            const [isDataModalOpen, setIsDataModalOpen] = useState(false);
             const [tourStep, setTourStep] = useState(0);
             const [isUpdateExpensesModalOpen, setUpdateExpensesModalOpen] = useState(false);
             const [editingTrip, setEditingTrip] = useState(null);
@@ -462,6 +470,10 @@
                     console.error("Failed to save data to localStorage", error);
                 }
             }, [trips]);
+
+            useEffect(() => {
+                setFilterPaidBy('All');
+            }, [activeTripId]);
 
             const startTour = () => {
                 setShowTourHint(false);
@@ -763,10 +775,30 @@
                 setExpenseModalOpen(true);
             };
 
+            const handleImportData = (importedTrips) => {
+                setTrips(prevTrips => {
+                    // Create a map of existing trips for O(1) lookup
+                    const tripMap = new Map(prevTrips.map(t => [t.id, t]));
+                    
+                    // Update or add imported trips
+                    importedTrips.forEach(t => {
+                        tripMap.set(t.id, t);
+                    });
+                    
+                    return Array.from(tripMap.values());
+                });
+            };
+
             // --- Derived State & Calculations (Memoized for performance) ---
             const activeTrip = useMemo(() => trips.find(t => t.id === activeTripId), [trips, activeTripId]);
 
             const settlement = useMemo(() => calculateSettlement(activeTrip), [activeTrip]);
+
+            const filteredExpenses = useMemo(() => {
+                if (!activeTrip) return [];
+                if (filterPaidBy === 'All') return activeTrip.expenses;
+                return activeTrip.expenses.filter(exp => exp.paidById === filterPaidBy);
+            }, [activeTrip, filterPaidBy]);
 
             const guestMap = useMemo(() => {
                 if (!activeTrip) return {};
@@ -777,19 +809,7 @@
                 activeTrip?.guests.find(g => g.id === editingGuestId), 
             [activeTrip, editingGuestId]);
 
-            const spendingOverTime = useMemo(() => {
-                if (!activeTrip || !activeTrip.expenses || activeTrip.expenses.length === 0) return null;
-
-                const dailyTotals = activeTrip.expenses.reduce((acc, expense) => {
-                    const date = expense.date; // YYYY-MM-DD
-                    acc[date] = (acc[date] || 0) + parseFloat(expense.amount);
-                    return acc;
-                }, {});
-
-                return Object.entries(dailyTotals)
-                    .map(([date, amount]) => ({ date, amount }))
-                    .sort((a, b) => new Date(a.date) - new Date(b.date));
-            }, [activeTrip]);
+            // Removed spendingOverTime calculation from App as it is now moved to SpendingChart component
 
             const guestSummaries = useMemo(() => {
                 if (!activeTrip) return {};
@@ -888,6 +908,9 @@
                         <div className="absolute top-4 right-4 flex items-center gap-2">
                             <button onClick={toggleTheme} className="p-2 rounded-full text-slate-400 hover:bg-white/10 hover:text-white transition-all" title="Toggle Theme">
                                 {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+                            </button>
+                            <button onClick={() => setIsDataModalOpen(true)} className="p-2 rounded-full text-slate-400 hover:bg-white/10 hover:text-white transition-all" title="Data Sync">
+                                <ArrowPathIcon />
                             </button>
                             <button onClick={startTour} className="p-2 rounded-full text-slate-400 hover:bg-white/10 hover:text-white transition-all" title="Show Guide">
                                 <QuestionMarkIcon />
@@ -992,6 +1015,12 @@
                             setCurrentStep={setTourStep}
                         />
                         <TripModal isOpen={isTripModalOpen} onClose={() => setTripModalOpen(false)} onTripAction={handleTripAction} tripToEdit={editingTrip} />
+                        <DataModal 
+                            isOpen={isDataModalOpen} 
+                            onClose={() => setIsDataModalOpen(false)} 
+                            currentData={trips} 
+                            onImport={handleImportData}
+                        />
                         <ConfirmationModal
                             isOpen={!!confirmAction}
                             onClose={handleModalClose}
@@ -1019,10 +1048,10 @@
                                 <div className="flex items-center gap-3 min-w-0">
                                     <button onClick={() => setActiveTripId(null)} className="p-2 rounded-full text-slate-400 hover:bg-white/10 hover:text-white transition-all active:scale-90 flex-shrink-0">
                                        <BackArrowIcon />
-                                   </button>
+                                    </button>
                                    <div className="min-w-0">
                                        <h1 id="trip-header" className="text-2xl sm:text-3xl font-bold text-white tracking-tight truncate" title={activeTrip.name}>
-                                           {activeTrip.name}
+                                            {activeTrip.name}
                                        </h1>
                                        <p className="text-sm text-slate-400">
                                             On: {new Date(activeTrip.date).toLocaleDateString()}
@@ -1035,6 +1064,9 @@
                                     </span>
                                      <button onClick={toggleTheme} className="p-2 rounded-full text-slate-400 hover:bg-white/10 hover:text-white transition-all" title="Toggle Theme">
                                         {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+                                    </button>
+                                    <button onClick={() => setIsDataModalOpen(true)} className="p-2 rounded-full text-slate-400 hover:bg-white/10 hover:text-white transition-all" title="Data Sync">
+                                        <ArrowPathIcon />
                                     </button>
                                     <button onClick={startTour} className="p-2 rounded-full text-slate-400 hover:bg-white/10 hover:text-white transition-all" title="Show Guide">
                                         <QuestionMarkIcon />
@@ -1117,16 +1149,44 @@
 
                                 {/* Expense List */}
                                 <div className="glass-card p-5 rounded-2xl">
-                                    <div className="flex justify-between items-center mb-4">
+                                    <div className="flex flex-row justify-between items-center mb-4">
                                         <h2 className="text-2xl font-bold text-white">Expenses</h2>
-                                        {activeTrip.expenses.length > 0 && (
-                                            <button onClick={() => setConfirmAction('removeAllExpenses')} className="text-rose-400 hover:text-rose-300 p-1 rounded-full hover:bg-rose-500/20 font-semibold text-sm flex items-center gap-1 transition-all active:scale-90">
-                                                <TrashIcon />
-                                            </button>
-                                        )}
+                                        <div className="flex items-center gap-2">
+                                             {activeTrip.expenses.length > 0 && (
+                                                <div className="relative">
+                                                    <select
+                                                        value={filterPaidBy}
+                                                        onChange={(e) => setFilterPaidBy(e.target.value)}
+                                                        className="appearance-none bg-slate-700/50 border border-slate-600 text-white text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block pl-3 pr-8 py-2 cursor-pointer hover:bg-slate-700 transition-colors"
+                                                    >
+                                                        <option value="All">All Payers</option>
+                                                        {activeTrip.guests.map(g => (
+                                                            <option key={g.id} value={g.id}>{g.name}</option>
+                                                        ))}
+                                                    </select>
+                                                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-400">
+                                                        <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {activeTrip.expenses.length > 0 && (
+                                                <button onClick={() => setConfirmAction('removeAllExpenses')} className="text-rose-400 hover:text-rose-300 p-2 rounded-full hover:bg-rose-500/20 font-semibold text-sm flex items-center gap-1 transition-all active:scale-90" title="Clear All Expenses">
+                                                    <TrashIcon />
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
                                     <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
-                                        {activeTrip.expenses.length > 0 ? activeTrip.expenses.map((expense, index) => (
+                                        {activeTrip.expenses.length === 0 ? (
+                                             <div className="text-center py-10">
+                                                <div className="flex justify-center mb-4">
+                                                    <ReceiptIcon />
+                                                </div>
+                                                <p className="text-slate-400">No expenses added yet.</p>
+                                                <p className="text-sm text-slate-500 mt-2">Add the first expense to see it here.</p>
+                                            </div>
+                                        ) : filteredExpenses.length > 0 ? (
+                                            filteredExpenses.map((expense, index) => (
                                             <div key={expense.id} className="bg-slate-900/40 p-4 rounded-lg flex items-start justify-between transition-all duration-200 hover:bg-slate-900/80 hover:shadow-lg animate-fadeInUp" style={{animationDelay: `${index * 0.1}s`, opacity: 0}}>
                                                 <div>
                                                     <div className="flex items-center gap-2">
@@ -1155,16 +1215,12 @@
                                                      </div>
                                                 </div>
                                             </div>
-                                        )) : (
-                                            <div className="text-center py-10">
-                                                <div className="flex justify-center mb-4">
-                                                    <ReceiptIcon />
-                                                </div>
-                                                <p className="text-slate-400">No expenses added yet.</p>
-                                                <p className="text-sm text-slate-500 mt-2">Add the first expense to see it here.</p>
+                                        ))) : (
+                                             <div className="text-center py-10">
+                                                <p className="text-slate-400">No expenses found for this filter.</p>
                                             </div>
                                         )}
-                                        </div>
+                                    </div>
                                 </div>
 
                                 {/* Settlement Summary */}
@@ -1221,9 +1277,9 @@
                                         <ActivityFeed history={activeTrip.history} />
                                     </div>
                                 )}
-                                {spendingOverTime && spendingOverTime.length > 1 && (
+                                {activeTrip.expenses && activeTrip.expenses.length > 0 && (
                                     <div className="animate-fadeInUp" style={{animationDelay: '0.6s', opacity: 0}}>
-                                        <SpendingChart data={spendingOverTime} />
+                                        <SpendingChart expenses={activeTrip.expenses} guests={activeTrip.guests} />
                                     </div>
                                 )}
                             </div>
@@ -1263,7 +1319,13 @@
                         guests={activeTrip.guests}
                         expenseToEdit={activeTrip.expenses.find(exp => exp.id === editingExpenseId)}
                     />
-                     <ConfirmationModal
+                    <DataModal 
+                        isOpen={isDataModalOpen} 
+                        onClose={() => setIsDataModalOpen(false)} 
+                        currentData={trips} 
+                        onImport={handleImportData}
+                    />
+                      <ConfirmationModal
                         isOpen={!!confirmAction}
                         onClose={handleModalClose}
                         onConfirm={handleConfirm}
@@ -1312,6 +1374,135 @@
                                      Dismiss
                                  </button>
                              </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function DataModal({ isOpen, onClose, currentData, onImport }) {
+            const [mode, setMode] = useState('export'); // 'export', 'import'
+            const [inputText, setInputText] = useState('');
+            const [message, setMessage] = useState({ text: '', type: '' }); // type: 'success' | 'error'
+
+            useEffect(() => {
+                if (isOpen) {
+                    setInputText('');
+                    setMessage({ text: '', type: '' });
+                    setMode('export');
+                }
+            }, [isOpen]);
+
+            const getExportData = () => JSON.stringify({ trips: currentData }, null, 2);
+
+            const handleCopy = () => {
+                const dataStr = getExportData();
+                navigator.clipboard.writeText(dataStr).then(() => {
+                    setMessage({ text: 'Data copied to clipboard!', type: 'success' });
+                    setTimeout(() => setMessage({ text: '', type: '' }), 3000);
+                }).catch(() => {
+                    // Fallback for clipboard issues
+                    const textArea = document.createElement("textarea");
+                    textArea.value = dataStr;
+                    document.body.appendChild(textArea);
+                    textArea.focus();
+                    textArea.select();
+                    try {
+                        document.execCommand('copy');
+                        setMessage({ text: 'Data copied to clipboard!', type: 'success' });
+                        setTimeout(() => setMessage({ text: '', type: '' }), 3000);
+                    } catch (err) {
+                        setMessage({ text: 'Failed to copy. Please manually select and copy.', type: 'error' });
+                    }
+                    document.body.removeChild(textArea);
+                });
+            };
+
+            const handleImport = () => {
+                try {
+                    if (!inputText.trim()) {
+                        setMessage({ text: 'Please paste data first.', type: 'error' });
+                        return;
+                    }
+                    const parsed = JSON.parse(inputText);
+                    if (!parsed.trips || !Array.isArray(parsed.trips)) {
+                        throw new Error('Invalid format');
+                    }
+                    onImport(parsed.trips);
+                    onClose();
+                } catch (e) {
+                    setMessage({ text: 'Invalid JSON data. Please check your input.', type: 'error' });
+                }
+            };
+
+            if (!isOpen) return null;
+
+            return (
+                <div 
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-70"
+                    onClick={onClose}
+                >
+                    <div 
+                        className="glass-modal rounded-xl shadow-xl w-full max-w-lg p-6"
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <h2 className="text-2xl font-bold mb-4 text-white">Data Sync</h2>
+                        
+                        <div className="flex border-b border-slate-700 mb-4">
+                            <button 
+                                className={`flex-1 pb-2 font-semibold text-sm ${mode === 'export' ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-slate-400 hover:text-slate-200'}`}
+                                onClick={() => { setMode('export'); setMessage({text:'', type:''}); }}
+                            >
+                                Export Data
+                            </button>
+                            <button 
+                                className={`flex-1 pb-2 font-semibold text-sm ${mode === 'import' ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-slate-400 hover:text-slate-200'}`}
+                                onClick={() => { setMode('import'); setMessage({text:'', type:''}); }}
+                            >
+                                Import Data
+                            </button>
+                        </div>
+
+                        {mode === 'export' ? (
+                            <div>
+                                <p className="text-sm text-slate-300 mb-2">Copy this JSON text and share it with another device.</p>
+                                <textarea 
+                                    readOnly 
+                                    value={getExportData()} 
+                                    className="w-full h-40 p-2 bg-slate-900 border border-slate-700 rounded-md text-slate-300 text-xs font-mono resize-none focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                                />
+                                <div className="mt-4 flex justify-between items-center">
+                                    <span className={`text-sm ${message.type === 'success' ? 'text-emerald-400' : 'text-rose-400'}`}>{message.text}</span>
+                                    <button onClick={handleCopy} className="py-2 px-4 bg-cyan-600 hover:bg-cyan-700 text-white rounded-md font-semibold transition-all active:scale-95 shadow-lg shadow-cyan-500/20">
+                                        Copy to Clipboard
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div>
+                                <p className="text-sm text-slate-300 mb-2">Paste the JSON text from another device here.</p>
+                                <textarea 
+                                    value={inputText}
+                                    onChange={(e) => setInputText(e.target.value)}
+                                    placeholder='Paste JSON data here...'
+                                    className="w-full h-40 p-2 bg-slate-900 border border-slate-700 rounded-md text-white text-xs font-mono resize-none focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                                />
+                                <div className="mt-4 flex justify-between items-center">
+                                    <span className={`text-sm ${message.type === 'success' ? 'text-emerald-400' : 'text-rose-400'}`}>{message.text}</span>
+                                    <button onClick={handleImport} className="py-2 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md font-semibold transition-all active:scale-95 shadow-lg shadow-emerald-500/20">
+                                        Import & Merge
+                                    </button>
+                                </div>
+                                <p className="text-xs text-slate-500 mt-2 text-center">Note: This will add new trips and update existing ones.</p>
+                            </div>
+                        )}
+                        
+                        <div className="absolute top-2 right-2">
+                            <button onClick={onClose} className="text-slate-400 hover:text-white p-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -1429,17 +1620,17 @@
                                      
                                      // Check if it fits on the right
                                      if (rect.right + gap + logicalPopupWidth < window.innerWidth - padding) {
-                                         popupStyle.left = `${rect.right + gap}px`;
+                                          popupStyle.left = `${rect.right + gap}px`;
                                      } 
                                      // Otherwise, check if it fits on the left
                                      else if (rect.left - logicalPopupWidth - gap > padding) {
-                                         popupStyle.left = `${rect.left - logicalPopupWidth - gap}px`;
+                                          popupStyle.left = `${rect.left - logicalPopupWidth - gap}px`;
                                      } 
                                      // If neither right nor left works, place it on the bottom as a fallback.
                                      else {
-                                        popupStyle.top = `${rect.bottom + gap}px`;
-                                        let centeredLeftFallback = rect.left + (rect.width / 2) - (logicalPopupWidth / 2);
-                                        popupStyle.left = `${Math.max(padding, Math.min(centeredLeftFallback, window.innerWidth - logicalPopupWidth - padding))}px`;
+                                         popupStyle.top = `${rect.bottom + gap}px`;
+                                         let centeredLeftFallback = rect.left + (rect.width / 2) - (logicalPopupWidth / 2);
+                                         popupStyle.left = `${Math.max(padding, Math.min(centeredLeftFallback, window.innerWidth - logicalPopupWidth - padding))}px`;
                                      }
                                     break;
 
@@ -1492,9 +1683,9 @@
                 const currentStepDef = tourSteps[currentStep];
                 
                 if (prevStep.page === 'home' && currentStepDef.page === 'trip') {
-                     setActiveTripId(null);
-                     // Delay setting the step to give React time to render the new page
-                     setTimeout(() => setCurrentStep(prevStepIndex), 50);
+                      setActiveTripId(null);
+                      // Delay setting the step to give React time to render the new page
+                      setTimeout(() => setCurrentStep(prevStepIndex), 50);
                 } else {
                     setCurrentStep(prevStepIndex);
                 }
@@ -1506,7 +1697,7 @@
 
             return (
                 <div className="fixed inset-0 z-[9998]" onClick={onClose}>
-                    <div
+                    <div 
                         className="fixed rounded-lg transition-all duration-300 pointer-events-none"
                         style={{
                             ...styles.highlighterStyle,
@@ -1574,11 +1765,11 @@
             if (!isOpen && !isAnimating) return null;
 
             return (
-                <div
+                <div 
                     className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-black transition-opacity duration-300 ${isAnimating ? 'bg-opacity-70' : 'bg-opacity-0'}`}
                     onClick={handleClose}
                 >
-                    <div
+                    <div 
                         className={`glass-modal rounded-xl shadow-xl w-full max-w-lg p-6 transform transition-all duration-300 ${isAnimating ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}
                         onClick={e => e.stopPropagation()}
                     >
@@ -1706,8 +1897,50 @@
             );
         }
 
-        function SpendingChart({ data }) {
-            const maxAmount = useMemo(() => Math.max(...data.map(d => d.amount)), [data]);
+        function SpendingChart({ expenses, guests }) {
+            const [filterId, setFilterId] = useState('All');
+
+            const data = useMemo(() => {
+                if (!expenses || expenses.length === 0) return [];
+
+                const dailyTotals = {};
+
+                expenses.forEach(expense => {
+                    const date = expense.date; // YYYY-MM-DD
+                    let amountToAdd = 0;
+
+                    if (filterId === 'All') {
+                        amountToAdd = parseFloat(expense.amount);
+                    } else {
+                        // Calculate share for the selected person
+                        const totalAmount = parseFloat(expense.amount);
+                        
+                        if (expense.splitType === 'equally') {
+                            if (expense.splitWith.includes(filterId)) {
+                                amountToAdd = totalAmount / expense.splitWith.length;
+                            }
+                        } else if (expense.splitType === 'amounts') {
+                            amountToAdd = parseFloat(expense.splitDetails?.[filterId] || 0);
+                        } else if (expense.splitType === 'percentages') {
+                            const percentage = parseFloat(expense.splitDetails?.[filterId] || 0);
+                            amountToAdd = totalAmount * (percentage / 100);
+                        }
+                    }
+
+                    if (amountToAdd > 0) {
+                        dailyTotals[date] = (dailyTotals[date] || 0) + amountToAdd;
+                    }
+                });
+
+                return Object.entries(dailyTotals)
+                    .map(([date, amount]) => ({ date, amount }))
+                    .sort((a, b) => new Date(a.date) - new Date(b.date));
+            }, [expenses, filterId]);
+
+            const maxAmount = useMemo(() => {
+                if (data.length === 0) return 0;
+                return Math.max(...data.map(d => d.amount));
+            }, [data]);
 
             const formatDate = (dateString) => {
                 const date = new Date(dateString);
@@ -1718,33 +1951,56 @@
 
             return (
                 <div className="glass-card p-5 rounded-2xl">
-                    <h2 className="text-2xl font-bold mb-4 flex items-center gap-2 text-white">
-                        <ChartBarIcon />
-                        Spending Over Time
-                    </h2>
-                    <div className="h-56 flex flex-col">
-                        <div className="flex-grow flex items-end gap-2 border-b border-slate-700 pb-2">
-                            {data.map((item, index) => (
-                                <div key={index} className="relative flex-1 h-full flex items-end justify-center group">
-                                    <div 
-                                        className="w-3/4 bg-cyan-500 rounded-t-md hover:bg-cyan-400 transition-colors"
-                                        style={{ height: `${(item.amount / maxAmount) * 100}%` }}
-                                    >
-                                    </div>
-                                    <div className="absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-slate-900/80 text-white text-xs font-bold py-1 px-2 rounded-md whitespace-nowrap">
-                                        ₹{item.amount.toFixed(2)}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                        <div className="flex items-start gap-2 pt-2 text-xs text-slate-400">
-                             {data.map((item, index) => (
-                                <div key={index} className="flex-1 text-center">
-                                    {formatDate(item.date)}
-                                </div>
-                             ))}
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-2xl font-bold flex items-center gap-2 text-white">
+                            <ChartBarIcon />
+                            {filterId === 'All' ? 'Total Spending Over Time' : 'Individual Share Over Time'}
+                        </h2>
+                        <div className="relative">
+                            <select
+                                value={filterId}
+                                onChange={(e) => setFilterId(e.target.value)}
+                                className="appearance-none bg-slate-700/50 border border-slate-600 text-white text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block pl-3 pr-8 py-2 cursor-pointer hover:bg-slate-700 transition-colors"
+                            >
+                                <option value="All">Everyone (Total)</option>
+                                {guests.map(g => (
+                                    <option key={g.id} value={g.id}>{g.name}'s Share</option>
+                                ))}
+                            </select>
+                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-400">
+                                <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                            </div>
                         </div>
                     </div>
+                    {data.length > 0 ? (
+                        <div className="h-56 flex flex-col">
+                            <div className="flex-grow flex items-end gap-2 border-b border-slate-700 pb-2">
+                                {data.map((item, index) => (
+                                    <div key={index} className="relative flex-1 h-full flex items-end justify-center group">
+                                        <div 
+                                            className="w-3/4 bg-cyan-500 rounded-t-md hover:bg-cyan-400 transition-colors"
+                                            style={{ height: `${(item.amount / maxAmount) * 100}%` }}
+                                        >
+                                        </div>
+                                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-slate-900/80 text-white text-xs font-bold py-1 px-2 rounded-md whitespace-nowrap">
+                                            ₹{item.amount.toFixed(2)}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="flex items-start gap-2 pt-2 text-xs text-slate-400">
+                                 {data.map((item, index) => (
+                                    <div key={index} className="flex-1 text-center">
+                                        {formatDate(item.date)}
+                                    </div>
+                                 ))}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="h-56 flex items-center justify-center text-slate-400">
+                            No spending data found for this selection.
+                        </div>
+                    )}
                 </div>
             );
         }
