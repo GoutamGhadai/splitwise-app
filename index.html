@@ -8,12 +8,24 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- React & ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    
+    <!-- Chart.js for Analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Babel Standalone -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
     <style>
         body {
             font-family: 'Inter', sans-serif;
             background-color: #020617; /* slate-950 */
             color: #e2e8f0; /* slate-200 */
-            transition: background-color 0.3s ease, color 0.3s ease;
+            transition: background-color 0.5s ease, color 0.5s ease;
+            overflow-x: hidden;
         }
         
         #bg-pattern {
@@ -25,7 +37,7 @@
             background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,0.05) 1px, transparent 0);
             background-size: 2rem 2rem;
             z-index: -2;
-            transition: background-image 0.3s ease;
+            transition: background-image 0.5s ease;
         }
         #bg-gradient {
             position: fixed;
@@ -33,10 +45,10 @@
             left: 0;
             width: 200%;
             height: 200%;
-            background: radial-gradient(circle at center, rgba(56, 189, 248, 0.1), rgba(16, 185, 129, 0.1), transparent 40%);
-            animation: rotate-gradient 25s linear infinite;
+            background: radial-gradient(circle at center, rgba(56, 189, 248, 0.1), rgba(16, 185, 129, 0.08), transparent 40%);
+            animation: rotate-gradient 30s linear infinite;
             z-index: -1;
-            transition: opacity 0.3s ease;
+            transition: opacity 0.5s ease;
         }
 
         @keyframes rotate-gradient {
@@ -45,127 +57,179 @@
         }
 
         .glass-card {
-            background: rgba(30, 41, 59, 0.5); /* slate-800 with 50% opacity */
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(30, 41, 59, 0.55); 
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
             box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-            transition: all 0.3s ease-in-out;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
         }
         .glass-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 12px 40px rgba(0,0,0,0.5), 0 0 20px rgba(56, 189, 248, 0.2);
+            transform: translateY(-4px);
+            box-shadow: 0 15px 45px rgba(0,0,0,0.5), 0 0 20px rgba(56, 189, 248, 0.15);
+            border-color: rgba(255, 255, 255, 0.15);
         }
-        .glass-modal {
-            background: rgba(15, 23, 42, 0.8); /* slate-900 with 80% opacity */
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+        
+        /* Carbon Texture for Dashboard & Graphs (Dark Mode) */
+        .carbon-card {
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.9) 100%),
+                        repeating-linear-gradient(45deg, rgba(0,0,0,0.15) 0px, rgba(0,0,0,0.15) 2px, transparent 2px, transparent 4px) !important;
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05), 0 8px 32px 0 rgba(0, 0, 0, 0.5) !important;
+            position: relative;
+            overflow: hidden;
         }
-        /* Custom scrollbar */
-        ::-webkit-scrollbar {
-            width: 8px;
-        }
-        ::-webkit-scrollbar-track {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 10px;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 10px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: rgba(255, 255, 255, 0.3);
+        .carbon-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: radial-gradient(circle at top right, rgba(56, 189, 248, 0.1), transparent 50%);
+            pointer-events: none;
         }
 
-        /* Light Theme */
+        .glass-modal {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+        }
+
+        /* Interactive List Items (Hover & Scale) */
+        .interactive-item {
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            position: relative;
+        }
+        .interactive-item:hover {
+            transform: translateY(-3px) scale(1.015);
+            box-shadow: 0 12px 24px -8px rgba(0,0,0,0.4);
+            z-index: 10;
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.25); }
+
+        /* --- WARM BUTTERY LIGHT THEME --- */
         body.light {
-            background-color: #f1f5f9; /* slate-100 */
-            color: #1e293b; /* slate-800 */
+            background-color: #fdfbf7; /* Warm off-white/cream */
+            color: #3e332a; /* Rich dark brown/gray for text */
         }
         .light #bg-pattern {
-            background-image: radial-gradient(circle at 1px 1px, rgba(0,0,0,0.04) 1px, transparent 0);
+            background-image: radial-gradient(circle at 1px 1px, rgba(139, 107, 74, 0.1) 1px, transparent 0);
         }
         .light #bg-gradient {
-            opacity: 0;
+            background: radial-gradient(circle at center, rgba(234, 179, 8, 0.05), rgba(249, 115, 22, 0.03), transparent 40%);
+            opacity: 1;
         }
+        
+        /* Glass Cards in Light Mode */
         .light .glass-card {
-            background: rgba(255, 255, 255, 0.6);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(0, 0, 0, 0.05);
-            box-shadow: 0 4px 20px rgba(0,0,0,0.07);
+            background: rgba(255, 253, 249, 0.85); /* Buttery white */
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(212, 196, 175, 0.4); /* Soft beige border */
+            box-shadow: 0 10px 30px rgba(139, 107, 74, 0.06), 0 1px 3px rgba(139, 107, 74, 0.03);
         }
-         .light .glass-card:hover {
-            box-shadow: 0 8px 25px rgba(0,0,0,0.1), 0 0 10px rgba(56, 189, 248, 0.1);
+        .light .glass-card:hover {
+            box-shadow: 0 15px 40px rgba(139, 107, 74, 0.12), 0 0 20px rgba(250, 204, 21, 0.1);
+            border-color: rgba(212, 196, 175, 0.8);
         }
+
+        /* Textured Dashboards in Light Mode (Subtle Paper/Noise) */
+        .light .carbon-card {
+            background: linear-gradient(135deg, rgba(255, 253, 249, 0.95), rgba(250, 246, 238, 0.9)), 
+                        url('data:image/svg+xml;utf8,<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><filter id="noiseFilter"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23noiseFilter)" opacity="0.04"/></svg>') !important;
+            border: 1px solid rgba(212, 196, 175, 0.6) !important;
+            box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.9), 0 8px 25px rgba(139, 107, 74, 0.08) !important;
+        }
+        .light .carbon-card::before {
+            background: radial-gradient(circle at top right, rgba(250, 204, 21, 0.05), transparent 50%);
+        }
+
         .light .glass-modal {
-            background: rgba(248, 250, 252, 0.8);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(0, 0, 0, 0.1);
+            background: rgba(255, 253, 249, 0.95);
+            border: 1px solid rgba(212, 196, 175, 0.5);
+            box-shadow: 0 25px 50px -12px rgba(139, 107, 74, 0.2);
         }
-        .light ::-webkit-scrollbar-track { background: rgba(0,0,0,0.05); }
-        .light ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); }
-        .light ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.3); }
+        .light ::-webkit-scrollbar-thumb { background: rgba(139, 107, 74, 0.2); }
+        .light ::-webkit-scrollbar-thumb:hover { background: rgba(139, 107, 74, 0.3); }
+
+        /* Light theme interactive items */
+        .light .interactive-item:hover {
+            box-shadow: 0 12px 24px -8px rgba(139, 107, 74, 0.25);
+        }
 
         /* Light theme text overrides */
-        .light .text-white { color: #0f172a; }
-        .light h1, .light h2, .light h3, .light .font-bold { color: #0f172a; }
-        .light .text-slate-200 { color: #334155; }
-        .light .text-slate-300 { color: #475569; }
-        .light .text-slate-400 { color: #64748b; }
-        .light .text-slate-500 { color: #64748b; }
+        .light .text-white { color: #29211a !important; }
+        .light h1, .light h2, .light h3, .light .font-bold { color: #29211a; }
+        .light .text-slate-200 { color: #504439; }
+        .light .text-slate-300 { color: #6e5e4f; }
+        .light .text-slate-400 { color: #8e7d6b; }
+        .light .text-slate-500 { color: #a89a8a; }
 
         /* Light theme component overrides */
-        .light input, .light select {
-            background-color: rgba(226, 232, 240, 0.5); /* slate-200/50 */
-            border-color: #cbd5e1; /* slate-300 */
-            color: #0f172a;
+        .light input, .light select, .light textarea {
+            background-color: rgba(245, 240, 230, 0.7) !important; 
+            border-color: #d8caba !important;
+            color: #29211a !important;
         }
-        .light .bg-slate-900\/40 { background-color: rgba(226, 232, 240, 0.5); }
-        .light .hover\:bg-slate-900\/80:hover { background-color: rgba(203, 213, 225, 0.7); }
-        .light .bg-slate-700\/50 { background-color: rgba(226, 232, 240, 0.8); }
-        .light .border-white\/10 { border-color: #e2e8f0; }
-        .light .bg-black\/20 { background-color: rgba(255,255,255,0.2); }
-
-        .light button.bg-slate-700 { background-color: #e2e8f0; color: #1e293b; }
-        .light button.hover\:bg-slate-600:hover { background-color: #cbd5e1; }
-        .light button.bg-slate-600 { background-color: #e2e8f0; color: #1e293b; }
-        .light button.hover\:bg-slate-500:hover { background-color: #cbd5e1; }
-
-        .light .text-slate-400.hover\:bg-white\/10:hover { background-color: rgba(0,0,0,0.05); }
-        .light .text-slate-300.hover\:bg-white\/10:hover { background-color: rgba(0,0,0,0.05); }
-
-        .light .bg-cyan-500\/20 { background-color: rgba(6, 182, 212, 0.1); }
-        .light .text-cyan-400 { color: #0891b2; }
-
-        .light .bg-emerald-500\/20 { background-color: rgba(16, 185, 129, 0.1); }
-        .light .text-emerald-400 { color: #059669; }
-
-        .light .bg-rose-500\/20 { background-color: rgba(244, 63, 94, 0.1); }
-        .light .text-rose-400 { color: #e11d48; }
-
-        .light .bg-amber-500\/20 { background-color: rgba(245, 158, 11, 0.1); }
-        .light .text-amber-400 { color: #d97706; }
+        .light input:focus, .light select:focus {
+            background-color: #fffcf5 !important;
+            border-color: #eab308 !important; /* amber-500 for focus */
+            box-shadow: 0 0 0 2px rgba(234, 179, 8, 0.2) !important;
+        }
         
-        .light .bg-blue-500\/20 { background-color: rgba(59, 130, 246, 0.1); }
+        .light .bg-slate-900\/40 { background-color: rgba(245, 240, 230, 0.6) !important; border: 1px solid rgba(212, 196, 175, 0.2); }
+        .light .hover\:bg-slate-900\/80:hover { background-color: rgba(235, 227, 212, 0.8) !important; }
+        .light .bg-slate-700\/50 { background-color: rgba(235, 227, 212, 0.7) !important; }
+        .light .border-white\/10 { border-color: rgba(212, 196, 175, 0.4) !important; }
+        .light .bg-black\/20 { background-color: rgba(139, 107, 74, 0.05) !important; }
+
+        .light button.bg-slate-700 { background-color: #e8ded1 !important; color: #3e332a !important; }
+        .light button.hover\:bg-slate-600:hover { background-color: #d8caba !important; }
+        .light button.bg-slate-600 { background-color: #e8ded1 !important; color: #3e332a !important; }
+        .light button.hover\:bg-slate-500:hover { background-color: #d8caba !important; }
+
+        .light .text-slate-400.hover\:bg-white\/10:hover { background-color: rgba(139, 107, 74, 0.1) !important; color:#29211a !important; }
+        .light .text-slate-300.hover\:bg-white\/10:hover { background-color: rgba(139, 107, 74, 0.1) !important; color:#29211a !important;}
+
+        /* Muted background colors for icons in light mode */
+        .light .bg-cyan-500\/20 { background-color: rgba(6, 182, 212, 0.15); }
+        .light .text-cyan-400 { color: #0891b2; }
+        .light .bg-emerald-500\/20 { background-color: rgba(16, 185, 129, 0.15); }
+        .light .text-emerald-400 { color: #059669; }
+        .light .bg-rose-500\/20 { background-color: rgba(244, 63, 94, 0.15); }
+        .light .text-rose-400 { color: #e11d48; }
+        .light .bg-amber-500\/20 { background-color: rgba(245, 158, 11, 0.15); }
+        .light .text-amber-400 { color: #d97706; }
+        .light .bg-blue-500\/20 { background-color: rgba(59, 130, 246, 0.15); }
         .light .text-blue-400 { color: #2563eb; }
 
-        /* Animation */
+        /* Animation Keyframes */
         @keyframes fadeInUp {
             from {
                 opacity: 0;
-                transform: translateY(15px);
+                transform: translateY(20px) scale(0.98);
             }
             to {
                 opacity: 1;
-                transform: translateY(0);
+                transform: translateY(0) scale(1);
             }
         }
         .animate-fadeInUp {
             opacity: 0;
-            animation: fadeInUp 0.5s ease-out forwards;
+            animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        @keyframes modalPop {
+            0% { opacity: 0; transform: scale(0.9) translateY(10px); }
+            100% { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .animate-modalPop {
+            animation: modalPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
         }
     </style>
 </head>
@@ -173,13 +237,6 @@
     <div id="bg-pattern"></div>
     <div id="bg-gradient"></div>
     <div id="root"></div>
-
-    <!-- React Libraries -->
-    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-
-    <!-- Babel Standalone for JSX compilation in the browser -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <script type="text/babel">
         // --- React Application Code ---
@@ -199,6 +256,7 @@
             Other: '#64748b', // slate-500
         };
         const AVATAR_COLORS = ['#f87171', '#fb923c', '#facc15', '#4ade80', '#38bdf8', '#a78bfa', '#f472b6'];
+        const CHART_PALETTE = ['#38bdf8', '#818cf8', '#c084fc', '#f472b6', '#fb7185', '#facc15', '#4ade80', '#2dd4bf', '#f87171', '#fb923c'];
 
         const generateId = () => `_${Math.random().toString(36).substr(2, 9)}`;
 
@@ -395,6 +453,12 @@
                 <path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.562.562 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.562.562 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5Z" />
             </svg>
         );
+        
+        const PresentationChartIcon = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8 13v-1m4 1v-3m4 3V8M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+            </svg>
+        );
 
         // --- Main App Component ---
         function App() {
@@ -410,6 +474,7 @@
             const [isTripModalOpen, setTripModalOpen] = useState(false);
             const [isTourOpen, setIsTourOpen] = useState(false);
             const [isDataModalOpen, setIsDataModalOpen] = useState(false);
+            const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
             const [tourStep, setTourStep] = useState(0);
             const [isUpdateExpensesModalOpen, setUpdateExpensesModalOpen] = useState(false);
             const [editingTrip, setEditingTrip] = useState(null);
@@ -760,6 +825,10 @@
                     modifyActiveTrip(trip => ({ ...trip, expenses: [], paidSettlements: {} }), 'All expenses were removed.');
                 } else if (confirmAction === 'deleteTrip') {
                     deleteTrip(actionTargetId);
+                } else if (confirmAction === 'removeGuest') {
+                    removeGuest(actionTargetId);
+                } else if (confirmAction === 'removeExpense') {
+                    removeExpense(actionTargetId);
                 }
                 setConfirmAction(null);
                 setActionTargetId(null);
@@ -898,6 +967,18 @@
                 modalBody = <p>Are you sure? This will permanently delete all expenses for this trip.</p>;
                 modalConfirmText = "Yes, Remove All Expenses";
                 isDestructive = true;
+            } else if (confirmAction === 'removeGuest') {
+                const guestName = activeTrip?.guests.find(g => g.id === actionTargetId)?.name;
+                modalTitle = "Remove Guest?";
+                modalBody = <p>Are you sure you want to remove <strong>{guestName}</strong>? Expenses paid by them will be deleted, and they will be removed from all split calculations.</p>;
+                modalConfirmText = "Yes, Remove Guest";
+                isDestructive = true;
+            } else if (confirmAction === 'removeExpense') {
+                const expDesc = activeTrip?.expenses.find(e => e.id === actionTargetId)?.description;
+                modalTitle = "Delete Expense?";
+                modalBody = <p>Are you sure you want to delete the expense "<strong>{expDesc}</strong>"?</p>;
+                modalConfirmText = "Yes, Delete Expense";
+                isDestructive = true;
             }
             
             // --- Renders ---
@@ -906,13 +987,16 @@
                     <div className="min-h-screen w-full font-sans flex flex-col items-center justify-center p-4 relative">
                         <TourStartHint show={showTourHint} onClose={() => setShowTourHint(false)} />
                         <div className="absolute top-4 right-4 flex items-center gap-2">
-                            <button onClick={toggleTheme} className="p-2 rounded-full text-slate-400 hover:bg-white/10 hover:text-white transition-all" title="Toggle Theme">
+                            <button onClick={() => setIsAnalyticsOpen(true)} className="p-2 rounded-full text-slate-400 hover:bg-white/10 hover:text-white transition-all interactive-item" title="Advanced Analytics">
+                                <PresentationChartIcon />
+                            </button>
+                            <button onClick={toggleTheme} className="p-2 rounded-full text-slate-400 hover:bg-white/10 hover:text-white transition-all interactive-item" title="Toggle Theme">
                                 {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
                             </button>
-                            <button onClick={() => setIsDataModalOpen(true)} className="p-2 rounded-full text-slate-400 hover:bg-white/10 hover:text-white transition-all" title="Data Sync">
+                            <button onClick={() => setIsDataModalOpen(true)} className="p-2 rounded-full text-slate-400 hover:bg-white/10 hover:text-white transition-all interactive-item" title="Data Sync">
                                 <ArrowPathIcon />
                             </button>
-                            <button onClick={startTour} className="p-2 rounded-full text-slate-400 hover:bg-white/10 hover:text-white transition-all" title="Show Guide">
+                            <button onClick={startTour} className="p-2 rounded-full text-slate-400 hover:bg-white/10 hover:text-white transition-all interactive-item" title="Show Guide">
                                 <QuestionMarkIcon />
                             </button>
                         </div>
@@ -931,7 +1015,7 @@
                                     const tripGuestMap = trip.guests.reduce((map, guest) => ({...map, [guest.id]: guest.name}), {});
 
                                     return (
-                                        <div key={trip.id} className="glass-card rounded-xl overflow-hidden" style={{animation: `fadeInUp 0.5s ${index * 0.1}s ease-out forwards`, opacity: 0}}>
+                                        <div key={trip.id} className="glass-card rounded-xl overflow-hidden interactive-item" style={{animation: `fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) ${index * 0.1}s forwards`, opacity: 0}}>
                                             <div className="p-4 flex justify-between items-center cursor-pointer" onClick={() => setExpandedTripId(prevId => prevId === trip.id ? null : trip.id)}>
                                                 <div>
                                                     <h2 className="font-bold text-xl text-left text-white">{trip.name}</h2>
@@ -971,7 +1055,7 @@
                                                                 const settlementKey = `${t.from}-${t.to}-${t.amount.toFixed(2)}`;
                                                                 const isPaid = trip.paidSettlements && trip.paidSettlements[settlementKey];
                                                                 return (
-                                                                    <li key={index} className="flex items-center justify-between bg-slate-700/50 p-3 rounded-lg gap-2">
+                                                                    <li key={index} className="flex items-center justify-between bg-slate-700/50 p-3 rounded-lg gap-2 interactive-item">
                                                                         <input
                                                                             type="checkbox"
                                                                             checked={isPaid || false}
@@ -1021,6 +1105,11 @@
                             currentData={trips} 
                             onImport={handleImportData}
                         />
+                        <AnalyticsModal 
+                            isOpen={isAnalyticsOpen}
+                            onClose={() => setIsAnalyticsOpen(false)}
+                            trips={trips}
+                        />
                         <ConfirmationModal
                             isOpen={!!confirmAction}
                             onClose={handleModalClose}
@@ -1046,7 +1135,7 @@
                         <header className="py-4 animate-fadeInUp">
                              <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3 min-w-0">
-                                    <button onClick={() => setActiveTripId(null)} className="p-2 rounded-full text-slate-400 hover:bg-white/10 hover:text-white transition-all active:scale-90 flex-shrink-0">
+                                    <button onClick={() => setActiveTripId(null)} className="p-2 rounded-full text-slate-400 hover:bg-white/10 hover:text-white transition-all active:scale-90 flex-shrink-0 interactive-item">
                                        <BackArrowIcon />
                                     </button>
                                    <div className="min-w-0">
@@ -1062,13 +1151,16 @@
                                     <span className="text-sm font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-500 hidden sm:block">
                                         ShareFare
                                     </span>
-                                     <button onClick={toggleTheme} className="p-2 rounded-full text-slate-400 hover:bg-white/10 hover:text-white transition-all" title="Toggle Theme">
+                                     <button onClick={() => setIsAnalyticsOpen(true)} className="p-2 rounded-full text-slate-400 hover:bg-white/10 hover:text-white transition-all interactive-item" title="Advanced Analytics">
+                                        <PresentationChartIcon />
+                                    </button>
+                                     <button onClick={toggleTheme} className="p-2 rounded-full text-slate-400 hover:bg-white/10 hover:text-white transition-all interactive-item" title="Toggle Theme">
                                         {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
                                     </button>
-                                    <button onClick={() => setIsDataModalOpen(true)} className="p-2 rounded-full text-slate-400 hover:bg-white/10 hover:text-white transition-all" title="Data Sync">
+                                    <button onClick={() => setIsDataModalOpen(true)} className="p-2 rounded-full text-slate-400 hover:bg-white/10 hover:text-white transition-all interactive-item" title="Data Sync">
                                         <ArrowPathIcon />
                                     </button>
-                                    <button onClick={startTour} className="p-2 rounded-full text-slate-400 hover:bg-white/10 hover:text-white transition-all" title="Show Guide">
+                                    <button onClick={startTour} className="p-2 rounded-full text-slate-400 hover:bg-white/10 hover:text-white transition-all interactive-item" title="Show Guide">
                                         <QuestionMarkIcon />
                                     </button>
                                 </div>
@@ -1096,7 +1188,7 @@
                                         {activeTrip.guests.length > 0 ? activeTrip.guests.map((guest, index) => {
                                             const summary = guestSummaries[guest.id] || { paid: 0, share: 0 };
                                             return (
-                                                <li key={guest.id} className="bg-slate-900/40 p-3 rounded-lg transition-all duration-200 hover:bg-slate-900/80 hover:shadow-lg animate-fadeInUp" style={{animationDelay: `${index * 0.1}s`, opacity: 0}}>
+                                                <li key={guest.id} className="bg-slate-900/40 p-3 rounded-lg interactive-item animate-fadeInUp" style={{animationDelay: `${index * 0.1}s`, opacity: 0}}>
                                                     <div className="flex justify-between items-center">
                                                         <div className="flex items-center gap-3">
                                                             <Avatar name={guest.name} />
@@ -1106,7 +1198,7 @@
                                                             <button onClick={() => handleOpenEditGuestModal(guest.id)} className="text-slate-400 hover:text-cyan-400 p-1 rounded-full hover:bg-cyan-500/20 transition-all active:scale-90">
                                                                 <EditIcon />
                                                             </button>
-                                                            <button onClick={() => removeGuest(guest.id)} className="text-slate-400 hover:text-rose-400 p-1 rounded-full hover:bg-rose-500/20 flex-shrink-0 transition-all active:scale-90">
+                                                            <button onClick={() => { setActionTargetId(guest.id); setConfirmAction('removeGuest'); }} className="text-slate-400 hover:text-rose-400 p-1 rounded-full hover:bg-rose-500/20 flex-shrink-0 transition-all active:scale-90">
                                                                 <TrashIcon />
                                                             </button>
                                                         </div>
@@ -1138,9 +1230,9 @@
 
                                 {/* Spending Summary */}
                                 {categorySummary && (
-                                    <div className="glass-card p-5 rounded-2xl">
-                                        <h2 className="text-2xl font-bold mb-4 text-white">Spending by Category</h2>
-                                        <div className="flex flex-col sm:flex-row items-center gap-4">
+                                    <div className="glass-card carbon-card p-5 rounded-2xl">
+                                        <h2 className="text-2xl font-bold mb-4 text-white relative z-10">Spending by Category</h2>
+                                        <div className="flex flex-col sm:flex-row items-center gap-4 relative z-10">
                                             <PieChart data={categorySummary} />
                                             <ChartLegend data={categorySummary} />
                                         </div>
@@ -1187,7 +1279,7 @@
                                             </div>
                                         ) : filteredExpenses.length > 0 ? (
                                             filteredExpenses.map((expense, index) => (
-                                            <div key={expense.id} className="bg-slate-900/40 p-4 rounded-lg flex items-start justify-between transition-all duration-200 hover:bg-slate-900/80 hover:shadow-lg animate-fadeInUp" style={{animationDelay: `${index * 0.1}s`, opacity: 0}}>
+                                            <div key={expense.id} className="bg-slate-900/40 p-4 rounded-lg flex items-start justify-between interactive-item animate-fadeInUp" style={{animationDelay: `${index * 0.1}s`, opacity: 0}}>
                                                 <div>
                                                     <div className="flex items-center gap-2">
                                                         <span 
@@ -1209,7 +1301,7 @@
                                                         <button onClick={() => handleOpenEditExpenseModal(expense.id)} className="text-slate-400 hover:text-cyan-400 p-1 rounded-full hover:bg-cyan-500/20 transition-all active:scale-90">
                                                             <EditIcon />
                                                         </button>
-                                                        <button onClick={() => removeExpense(expense.id)} className="text-slate-400 hover:text-rose-400 p-1 rounded-full hover:bg-rose-500/20 transition-all active:scale-90">
+                                                        <button onClick={() => { setActionTargetId(expense.id); setConfirmAction('removeExpense'); }} className="text-slate-400 hover:text-rose-400 p-1 rounded-full hover:bg-rose-500/20 transition-all active:scale-90">
                                                             <TrashIcon />
                                                         </button>
                                                      </div>
@@ -1243,7 +1335,7 @@
                                                 return (
                                                     <li 
                                                         key={index} 
-                                                        className="flex items-center justify-between bg-slate-900/40 p-4 rounded-lg gap-2"
+                                                        className="flex items-center justify-between bg-slate-900/40 p-4 rounded-lg gap-2 interactive-item"
                                                     >
                                                         <input
                                                             type="checkbox"
@@ -1325,6 +1417,11 @@
                         currentData={trips} 
                         onImport={handleImportData}
                     />
+                    <AnalyticsModal 
+                        isOpen={isAnalyticsOpen}
+                        onClose={() => setIsAnalyticsOpen(false)}
+                        trips={trips}
+                    />
                       <ConfirmationModal
                         isOpen={!!confirmAction}
                         onClose={handleModalClose}
@@ -1342,6 +1439,291 @@
 
         // --- Child Components ---
 
+        function AnalyticsModal({ isOpen, onClose, trips }) {
+            const [isAnimating, setIsAnimating] = useState(false);
+            const [chartType, setChartType] = useState('Bar'); // Bar, Line, Pie
+            const [groupBy, setGroupBy] = useState('month'); // month, year, category, person
+            const [metric, setMetric] = useState('paid'); // paid, share
+            const [dataSource, setDataSource] = useState('all'); // all, or tripId
+            
+            const chartRef = React.useRef(null);
+            const chartInstanceRef = React.useRef(null);
+
+            useEffect(() => {
+                if (isOpen) {
+                    requestAnimationFrame(() => setIsAnimating(true));
+                } else {
+                    setIsAnimating(false);
+                }
+            }, [isOpen]);
+
+            const handleClose = () => {
+                setIsAnimating(false);
+                setTimeout(onClose, 300);
+            };
+
+            const chartData = useMemo(() => {
+                if (!trips || trips.length === 0) return { data: [], seriesKeys: [] };
+
+                const filteredTrips = dataSource === 'all' ? trips : trips.filter(t => t.id === dataSource);
+                const grouped = {};
+                const seriesKeysSet = new Set();
+
+                filteredTrips.forEach(trip => {
+                    // standardize names to handle guests across trips
+                    const tripGuestMap = trip.guests.reduce((acc, g) => ({...acc, [g.id]: g.name.trim()}), {});
+
+                    trip.expenses.forEach(exp => {
+                        const dateObj = new Date(exp.date);
+                        let xKey;
+                        
+                        if (groupBy === 'month') {
+                            // "Jan 2023"
+                            xKey = dateObj.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+                        } else if (groupBy === 'year') {
+                            xKey = dateObj.getFullYear().toString();
+                        } else if (groupBy === 'category') {
+                            xKey = exp.category || 'Other';
+                        } else if (groupBy === 'person') {
+                            xKey = null; // handled individually
+                        }
+
+                        const valuesByPerson = {};
+                        const totalAmount = parseFloat(exp.amount);
+
+                        if (metric === 'paid') {
+                            const payerName = tripGuestMap[exp.paidById] || 'Unknown';
+                            valuesByPerson[payerName] = totalAmount;
+                        } else { // share
+                            if (exp.splitType === 'equally') {
+                                const share = totalAmount / exp.splitWith.length;
+                                exp.splitWith.forEach(id => {
+                                    const name = tripGuestMap[id];
+                                    if(name) valuesByPerson[name] = (valuesByPerson[name] || 0) + share;
+                                });
+                            } else if (exp.splitType === 'amounts') {
+                                Object.entries(exp.splitDetails || {}).forEach(([id, amt]) => {
+                                    const name = tripGuestMap[id];
+                                    if(name) valuesByPerson[name] = (valuesByPerson[name] || 0) + parseFloat(amt);
+                                });
+                            } else if (exp.splitType === 'percentages') {
+                                Object.entries(exp.splitDetails || {}).forEach(([id, pct]) => {
+                                    const name = tripGuestMap[id];
+                                    if(name) valuesByPerson[name] = (valuesByPerson[name] || 0) + totalAmount * (parseFloat(pct)/100);
+                                });
+                            }
+                        }
+
+                        if (groupBy !== 'person') {
+                            if (!grouped[xKey]) grouped[xKey] = { name: xKey, Total: 0, sortDate: dateObj.getTime() };
+                            Object.entries(valuesByPerson).forEach(([person, val]) => {
+                                grouped[xKey][person] = (grouped[xKey][person] || 0) + val;
+                                grouped[xKey].Total += val;
+                                seriesKeysSet.add(person);
+                            });
+                        } else {
+                            Object.entries(valuesByPerson).forEach(([person, val]) => {
+                                if (!grouped[person]) grouped[person] = { name: person, value: 0 };
+                                grouped[person].value += val;
+                            });
+                        }
+                    });
+                });
+
+                let result = Object.values(grouped);
+
+                // Sorting
+                if (groupBy === 'month') {
+                    result.sort((a, b) => a.sortDate - b.sortDate);
+                } else if (groupBy === 'year') {
+                    result.sort((a, b) => a.name.localeCompare(b.name));
+                } else {
+                    result.sort((a, b) => (b.Total !== undefined ? b.Total : b.value) - (a.Total !== undefined ? a.Total : a.value));
+                }
+
+                return { data: result, seriesKeys: Array.from(seriesKeysSet) };
+
+            }, [trips, dataSource, groupBy, metric]);
+
+            useEffect(() => {
+                if (!isOpen || !chartRef.current || chartData.data.length === 0 || !window.Chart) return;
+
+                const { data, seriesKeys } = chartData;
+                let labels = data.map(d => d.name);
+                let datasets = [];
+
+                if (chartType === 'Pie') {
+                    const dataKey = groupBy === 'person' ? 'value' : 'Total';
+                    datasets = [{
+                        data: data.map(d => d[dataKey]),
+                        backgroundColor: CHART_PALETTE,
+                        borderColor: '#020617', // slate-950 border
+                        borderWidth: 2,
+                        hoverOffset: 10
+                    }];
+                } else {
+                    if (groupBy === 'person') {
+                        datasets = [{
+                            label: metric === 'paid' ? 'Amount Paid' : 'Share Owed',
+                            data: data.map(d => d.value),
+                            backgroundColor: chartType === 'Line' ? CHART_PALETTE[0] : CHART_PALETTE,
+                            borderColor: chartType === 'Line' ? CHART_PALETTE[0] : CHART_PALETTE,
+                            borderDash: chartType === 'Line' ? [5, 5] : [],
+                            borderWidth: 2,
+                            fill: false,
+                            tension: 0.3,
+                            pointRadius: 4,
+                            pointHoverRadius: 7
+                        }];
+                    } else {
+                        datasets = seriesKeys.map((key, i) => ({
+                            label: key,
+                            data: data.map(d => d[key] || 0),
+                            backgroundColor: CHART_PALETTE[i % CHART_PALETTE.length],
+                            borderColor: CHART_PALETTE[i % CHART_PALETTE.length],
+                            borderDash: chartType === 'Line' ? [5, 5] : [],
+                            borderWidth: 2,
+                            fill: false,
+                            tension: 0.3,
+                            pointRadius: 4,
+                            pointHoverRadius: 7
+                        }));
+                    }
+                }
+
+                if (chartInstanceRef.current) {
+                    chartInstanceRef.current.destroy();
+                }
+
+                const ctx = chartRef.current.getContext('2d');
+                chartInstanceRef.current = new window.Chart(ctx, {
+                    type: chartType.toLowerCase(),
+                    data: { labels, datasets },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: { duration: 800, easing: 'easeOutQuart' },
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    color: '#cbd5e1', // slate-300
+                                    font: { family: 'Inter', size: 12, weight: '500' },
+                                    usePointStyle: true,
+                                    padding: 20
+                                }
+                            },
+                            tooltip: {
+                                backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                                titleColor: '#fff',
+                                bodyColor: '#e2e8f0',
+                                borderColor: 'rgba(255,255,255,0.1)',
+                                borderWidth: 1,
+                                padding: 12,
+                                boxPadding: 6,
+                                usePointStyle: true,
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        if (label) label += ': ';
+                                        if (context.parsed.y !== null && context.parsed.y !== undefined) {
+                                            label += '₹' + context.parsed.y.toFixed(2);
+                                        } else if (context.parsed !== null && context.parsed !== undefined) {
+                                            label += '₹' + context.parsed.toFixed(2);
+                                        }
+                                        return label;
+                                    }
+                                }
+                            }
+                        },
+                        scales: chartType === 'Pie' ? {} : {
+                            x: {
+                                grid: { display: false, color: '#334155' },
+                                ticks: { color: '#94a3b8', font: { family: 'Inter' } },
+                                stacked: chartType === 'Bar' && groupBy !== 'person'
+                            },
+                            y: {
+                                grid: { borderDash: [3, 3], color: '#334155' },
+                                ticks: { 
+                                    color: '#94a3b8', 
+                                    font: { family: 'Inter' },
+                                    callback: (val) => '₹' + val 
+                                },
+                                stacked: chartType === 'Bar' && groupBy !== 'person',
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+
+            }, [chartData, chartType, isOpen]);
+
+            if (!isOpen && !isAnimating) return null;
+
+            return (
+                <div 
+                    className={`fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black transition-opacity duration-300 ${isAnimating ? 'bg-opacity-80' : 'bg-opacity-0'}`}
+                    onClick={handleClose}
+                >
+                    <div 
+                        className={`glass-modal rounded-2xl shadow-2xl w-full max-w-6xl h-[90vh] sm:h-[85vh] flex flex-col transform transition-all duration-500 cubic-bezier(0.34, 1.56, 0.64, 1) ${isAnimating ? 'scale-100 opacity-100 translate-y-0' : 'scale-95 opacity-0 translate-y-10'}`}
+                        onClick={e => e.stopPropagation()}
+                    >
+                        {/* Header & Controls */}
+                        <div className="p-6 border-b border-slate-700/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 z-20">
+                            <div>
+                                <h2 className="text-2xl font-bold flex items-center gap-2 text-white">
+                                    <PresentationChartIcon /> Advanced Analytics
+                                </h2>
+                                <p className="text-sm text-slate-400 mt-1">Interactive visualizations of your expenses</p>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-3">
+                                <select value={dataSource} onChange={e => setDataSource(e.target.value)} className="bg-slate-800/80 border border-slate-600 text-white text-sm rounded-lg focus:ring-cyan-500 py-1.5 px-3 outline-none cursor-pointer">
+                                    <option value="all">All Trips</option>
+                                    {trips.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                                </select>
+                                <select value={metric} onChange={e => setMetric(e.target.value)} className="bg-slate-800/80 border border-slate-600 text-white text-sm rounded-lg focus:ring-cyan-500 py-1.5 px-3 outline-none cursor-pointer">
+                                    <option value="paid">Total Paid</option>
+                                    <option value="share">Total Share Owed</option>
+                                </select>
+                                <select value={groupBy} onChange={e => setGroupBy(e.target.value)} className="bg-slate-800/80 border border-slate-600 text-white text-sm rounded-lg focus:ring-cyan-500 py-1.5 px-3 outline-none cursor-pointer">
+                                    <option value="month">By Month</option>
+                                    <option value="year">By Year</option>
+                                    <option value="category">By Category</option>
+                                    <option value="person">By Person</option>
+                                </select>
+                                
+                                <div className="flex bg-slate-800/80 border border-slate-600 rounded-lg p-0.5">
+                                    {['Bar', 'Line', 'Pie'].map(type => (
+                                        <button 
+                                            key={type} 
+                                            onClick={() => setChartType(type)}
+                                            className={`px-3 py-1 text-sm rounded-md transition-all ${chartType === type ? 'bg-cyan-500 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+                                        >
+                                            {type}
+                                        </button>
+                                    ))}
+                                </div>
+                                <button onClick={handleClose} className="p-1.5 rounded-full text-slate-400 hover:bg-white/10 hover:text-white transition-all ml-2" title="Close">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Chart Area */}
+                        <div className="flex-1 p-6 min-h-0 relative z-10 w-full overflow-hidden bg-black/10">
+                            {chartData.data.length === 0 ? (
+                                <div className="flex items-center justify-center h-full text-slate-400 font-medium">No data available for the selected filters.</div>
+                            ) : (
+                                <canvas ref={chartRef}></canvas>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
         function TourStartHint({ show, onClose }) {
             const [isAnimating, setIsAnimating] = useState(false);
 
@@ -1356,7 +1738,7 @@
             if (!show && !isAnimating) return null;
 
             return (
-                <div className={`fixed top-5 right-5 z-[1000] w-64 transform transition-all duration-300 ${isAnimating ? 'translate-y-0 opacity-100' : '-translate-y-5 opacity-0'}`}>
+                <div className={`fixed top-5 right-5 z-[1000] w-64 transform transition-all duration-500 cubic-bezier(0.34, 1.56, 0.64, 1) ${isAnimating ? 'translate-y-0 opacity-100' : '-translate-y-10 opacity-0'}`}>
                     <div className="glass-modal p-4 rounded-lg shadow-xl relative">
                         <div className="absolute -top-2 right-6 w-4 h-4" style={{ 
                             background: 'inherit',
@@ -1384,6 +1766,7 @@
             const [mode, setMode] = useState('export'); // 'export', 'import'
             const [inputText, setInputText] = useState('');
             const [message, setMessage] = useState({ text: '', type: '' }); // type: 'success' | 'error'
+            const fileInputRef = React.useRef(null);
 
             useEffect(() => {
                 if (isOpen) {
@@ -1394,6 +1777,25 @@
             }, [isOpen]);
 
             const getExportData = () => JSON.stringify({ trips: currentData }, null, 2);
+
+            const handleDownload = () => {
+                try {
+                    const dataStr = getExportData();
+                    const blob = new Blob([dataStr], { type: "application/json" });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `ShareFare_Backup_${new Date().toISOString().split('T')[0]}.json`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+                    setMessage({ text: 'File downloaded!', type: 'success' });
+                    setTimeout(() => setMessage({ text: '', type: '' }), 3000);
+                } catch (err) {
+                    setMessage({ text: 'Failed to download file.', type: 'error' });
+                }
+            };
 
             const handleCopy = () => {
                 const dataStr = getExportData();
@@ -1418,6 +1820,23 @@
                 });
             };
 
+            const handleFileChange = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    setInputText(event.target.result);
+                    setMessage({ text: 'File loaded. Click Import & Merge to proceed.', type: 'success' });
+                    // Reset input so the same file can be selected again if needed
+                    e.target.value = null; 
+                };
+                reader.onerror = () => {
+                    setMessage({ text: 'Failed to read file.', type: 'error' });
+                };
+                reader.readAsText(file);
+            };
+
             const handleImport = () => {
                 try {
                     if (!inputText.trim()) {
@@ -1439,24 +1858,24 @@
 
             return (
                 <div 
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-70"
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-70 animate-fadeInUp" style={{animationDuration: '0.3s'}}
                     onClick={onClose}
                 >
                     <div 
-                        className="glass-modal rounded-xl shadow-xl w-full max-w-lg p-6"
+                        className="glass-modal rounded-xl shadow-xl w-full max-w-lg p-6 animate-modalPop"
                         onClick={e => e.stopPropagation()}
                     >
                         <h2 className="text-2xl font-bold mb-4 text-white">Data Sync</h2>
                         
                         <div className="flex border-b border-slate-700 mb-4">
                             <button 
-                                className={`flex-1 pb-2 font-semibold text-sm ${mode === 'export' ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-slate-400 hover:text-slate-200'}`}
+                                className={`flex-1 pb-2 font-semibold text-sm transition-all ${mode === 'export' ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-slate-400 hover:text-slate-200'}`}
                                 onClick={() => { setMode('export'); setMessage({text:'', type:''}); }}
                             >
                                 Export Data
                             </button>
                             <button 
-                                className={`flex-1 pb-2 font-semibold text-sm ${mode === 'import' ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-slate-400 hover:text-slate-200'}`}
+                                className={`flex-1 pb-2 font-semibold text-sm transition-all ${mode === 'import' ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-slate-400 hover:text-slate-200'}`}
                                 onClick={() => { setMode('import'); setMessage({text:'', type:''}); }}
                             >
                                 Import Data
@@ -1465,31 +1884,52 @@
 
                         {mode === 'export' ? (
                             <div>
-                                <p className="text-sm text-slate-300 mb-2">Copy this JSON text and share it with another device.</p>
+                                <p className="text-sm text-slate-300 mb-2">Download your data as a JSON file or copy the text below.</p>
                                 <textarea 
                                     readOnly 
                                     value={getExportData()} 
-                                    className="w-full h-40 p-2 bg-slate-900 border border-slate-700 rounded-md text-slate-300 text-xs font-mono resize-none focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                                    className="w-full h-40 p-2 bg-slate-900 border border-slate-700 rounded-md text-slate-300 text-xs font-mono resize-none focus:outline-none focus:ring-1 focus:ring-cyan-500 transition-all"
                                 />
                                 <div className="mt-4 flex justify-between items-center">
-                                    <span className={`text-sm ${message.type === 'success' ? 'text-emerald-400' : 'text-rose-400'}`}>{message.text}</span>
-                                    <button onClick={handleCopy} className="py-2 px-4 bg-cyan-600 hover:bg-cyan-700 text-white rounded-md font-semibold transition-all active:scale-95 shadow-lg shadow-cyan-500/20">
-                                        Copy to Clipboard
-                                    </button>
+                                    <span className={`text-sm font-semibold transition-opacity duration-300 ${message.type === 'success' ? 'text-emerald-400 opacity-100' : message.type === 'error' ? 'text-rose-400 opacity-100' : 'opacity-0'}`}>{message.text || '...'}</span>
+                                    <div className="flex gap-2">
+                                        <button onClick={handleCopy} className="py-2 px-3 bg-slate-700 hover:bg-slate-600 text-white rounded-md font-semibold transition-all active:scale-95 shadow-sm text-sm hover:shadow-lg hover:-translate-y-0.5">
+                                            Copy Text
+                                        </button>
+                                        <button onClick={handleDownload} className="py-2 px-4 bg-cyan-600 hover:bg-cyan-700 text-white rounded-md font-semibold transition-all active:scale-95 shadow-lg shadow-cyan-500/20 text-sm hover:shadow-cyan-500/40 hover:-translate-y-0.5">
+                                            Download .json
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         ) : (
                             <div>
-                                <p className="text-sm text-slate-300 mb-2">Paste the JSON text from another device here.</p>
+                                <p className="text-sm text-slate-300 mb-2">Select a JSON file or paste the data below.</p>
+                                <input 
+                                    type="file" 
+                                    accept=".json"
+                                    ref={fileInputRef}
+                                    onChange={handleFileChange}
+                                    className="hidden"
+                                />
+                                <div className="mb-3">
+                                    <button 
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className="py-2 px-4 bg-slate-700 hover:bg-slate-600 text-white rounded-md font-semibold transition-all active:scale-95 text-sm flex items-center justify-center gap-2 w-full border border-slate-600 border-dashed hover:border-cyan-500 hover:text-cyan-400"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                                        Select .json File
+                                    </button>
+                                </div>
                                 <textarea 
                                     value={inputText}
                                     onChange={(e) => setInputText(e.target.value)}
                                     placeholder='Paste JSON data here...'
-                                    className="w-full h-40 p-2 bg-slate-900 border border-slate-700 rounded-md text-white text-xs font-mono resize-none focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                                    className="w-full h-28 p-2 bg-slate-900 border border-slate-700 rounded-md text-white text-xs font-mono resize-none focus:outline-none focus:ring-1 focus:ring-cyan-500 transition-all"
                                 />
                                 <div className="mt-4 flex justify-between items-center">
-                                    <span className={`text-sm ${message.type === 'success' ? 'text-emerald-400' : 'text-rose-400'}`}>{message.text}</span>
-                                    <button onClick={handleImport} className="py-2 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md font-semibold transition-all active:scale-95 shadow-lg shadow-emerald-500/20">
+                                    <span className={`text-sm font-semibold transition-opacity duration-300 ${message.type === 'success' ? 'text-emerald-400 opacity-100' : message.type === 'error' ? 'text-rose-400 opacity-100' : 'opacity-0'}`}>{message.text || '...'}</span>
+                                    <button onClick={handleImport} className="py-2 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md font-semibold transition-all active:scale-95 shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40 hover:-translate-y-0.5">
                                         Import & Merge
                                     </button>
                                 </div>
@@ -1498,7 +1938,7 @@
                         )}
                         
                         <div className="absolute top-2 right-2">
-                            <button onClick={onClose} className="text-slate-400 hover:text-white p-2">
+                            <button onClick={onClose} className="text-slate-400 hover:text-white p-2 transition-transform hover:rotate-90">
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                 </svg>
@@ -1704,12 +2144,12 @@
                             boxShadow: '0 0 0 5000px rgba(15, 23, 42, 0.85)',
                         }}
                     ></div>
-                    <div className="fixed glass-modal p-6 rounded-lg z-[9999] transition-all duration-300 w-80 max-w-[calc(100vw-2rem)]" style={styles.popupStyle} onClick={e => e.stopPropagation()}>
+                    <div className="fixed glass-modal p-6 rounded-lg z-[9999] transition-all duration-500 cubic-bezier(0.34, 1.56, 0.64, 1) w-80 max-w-[calc(100vw-2rem)] shadow-2xl" style={styles.popupStyle} onClick={e => e.stopPropagation()}>
                         <div className="text-center">
                             <h2 className="text-xl font-bold mb-2 text-white">{step.title}</h2>
-                            <p className="text-slate-300 mb-4 text-sm">{step.content}</p>
+                            <p className="text-slate-300 mb-4 text-sm leading-relaxed">{step.content}</p>
                         </div>
-                        <div className="flex justify-between items-center">
+                        <div className="flex justify-between items-center mt-2">
                             <span className="text-xs font-bold text-slate-400">{currentStep + 1} / {tourSteps.length}</span>
                             <div className="flex gap-2">
                                 {currentStep > 0 && 
@@ -1770,7 +2210,7 @@
                     onClick={handleClose}
                 >
                     <div 
-                        className={`glass-modal rounded-xl shadow-xl w-full max-w-lg p-6 transform transition-all duration-300 ${isAnimating ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}
+                        className={`glass-modal rounded-xl shadow-xl w-full max-w-lg p-6 transform transition-all duration-400 cubic-bezier(0.34, 1.56, 0.64, 1) ${isAnimating ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`}
                         onClick={e => e.stopPropagation()}
                     >
                         <h2 className="text-2xl font-bold mb-2 text-white">Update Past Expenses?</h2>
@@ -1779,24 +2219,24 @@
                         </p>
 
                         <div className="space-y-2 max-h-60 overflow-y-auto pr-2 border-y border-slate-700 py-3">
-                            <div className="flex items-center gap-3 p-2">
+                            <div className="flex items-center gap-3 p-2 cursor-pointer group" onClick={toggleAll}>
                                 <input
                                     type="checkbox"
                                     checked={selectedIds.length === expensesToUpdate.length && expensesToUpdate.length > 0}
-                                    onChange={toggleAll}
-                                    className="h-5 w-5 rounded bg-slate-600 border-slate-500 text-cyan-500 focus:ring-cyan-500"
+                                    readOnly
+                                    className="h-5 w-5 rounded bg-slate-600 border-slate-500 text-cyan-500 focus:ring-cyan-500 pointer-events-none"
                                 />
-                                <label className="font-bold text-white">Select All</label>
+                                <label className="font-bold text-white group-hover:text-cyan-400 transition-colors pointer-events-none">Select All</label>
                             </div>
                             {expensesToUpdate.map(expense => (
-                                <div key={expense.id} className={`flex items-center gap-3 p-2 rounded-md transition-colors ${selectedIds.includes(expense.id) ? 'bg-cyan-500/20' : 'bg-slate-700/30'}`}>
+                                <div key={expense.id} onClick={() => toggleOne(expense.id)} className={`flex items-center gap-3 p-2 rounded-md transition-colors cursor-pointer hover:-translate-y-0.5 interactive-item ${selectedIds.includes(expense.id) ? 'bg-cyan-500/20' : 'bg-slate-700/30 hover:bg-slate-700/50'}`}>
                                      <input
                                         type="checkbox"
                                         checked={selectedIds.includes(expense.id)}
-                                        onChange={() => toggleOne(expense.id)}
-                                        className="h-5 w-5 rounded bg-slate-600 border-slate-500 text-cyan-500 focus:ring-cyan-500"
+                                        readOnly
+                                        className="h-5 w-5 rounded bg-slate-600 border-slate-500 text-cyan-500 focus:ring-cyan-500 pointer-events-none"
                                     />
-                                    <div className="flex-grow">
+                                    <div className="flex-grow pointer-events-none">
                                         <p className="font-semibold text-slate-200">{expense.description}</p>
                                         <p className="text-sm text-slate-400">₹{expense.amount.toFixed(2)} on {new Date(expense.date).toLocaleDateString()}</p>
                                     </div>
@@ -1805,10 +2245,10 @@
                         </div>
                         
                         <div className="flex justify-end gap-4 mt-6">
-                            <button type="button" onClick={handleClose} className="py-2 px-4 bg-slate-700 hover:bg-slate-600 rounded-md font-semibold transition-all active:scale-95 text-white">
+                            <button type="button" onClick={handleClose} className="py-2 px-4 bg-slate-700 hover:bg-slate-600 rounded-md font-semibold transition-all active:scale-95 text-white hover:-translate-y-0.5">
                                 Just Add Guest
                             </button>
-                            <button type="button" onClick={handleConfirm} className="py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md font-semibold transition-all active:scale-95 shadow-lg shadow-indigo-500/30">
+                            <button type="button" onClick={handleConfirm} className="py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md font-semibold transition-all active:scale-95 shadow-lg shadow-indigo-500/30 hover:-translate-y-0.5 hover:shadow-indigo-500/50">
                                 Update {selectedIds.length > 0 ? selectedIds.length : ''} Expense(s)
                             </button>
                         </div>
@@ -1859,22 +2299,22 @@
                 <div className="mb-8 animate-fadeInUp" style={{animationDelay: '0.1s'}}>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {/* Total Cost */}
-                        <div className="glass-card p-5 rounded-2xl flex items-center gap-4">
-                            <div className="bg-blue-500/20 p-3 rounded-lg text-blue-400">
+                        <div className="glass-card carbon-card p-5 rounded-2xl flex items-center gap-4 group">
+                            <div className="bg-blue-500/20 p-3 rounded-lg text-blue-400 group-hover:scale-110 group-hover:bg-blue-500/30 transition-all duration-300">
                                 <WalletIcon />
                             </div>
-                            <div>
+                            <div className="relative z-10">
                                 <p className="text-sm text-slate-400 font-medium">Total Trip Cost</p>
-                                <p className="text-2xl font-bold text-white">₹{dashboardStats.totalCost.toFixed(2)}</p>
+                                <p className="text-2xl font-bold text-white group-hover:text-cyan-200 transition-colors">₹{dashboardStats.totalCost.toFixed(2)}</p>
                             </div>
                         </div>
 
                         {/* Your Balance */}
-                        <div className="glass-card p-5 rounded-2xl flex items-center gap-4">
-                            <div className={`${dashboardStats.yourBalance >= 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'} p-3 rounded-lg`}>
+                        <div className="glass-card carbon-card p-5 rounded-2xl flex items-center gap-4 group">
+                            <div className={`${dashboardStats.yourBalance >= 0 ? 'bg-emerald-500/20 text-emerald-400 group-hover:bg-emerald-500/30' : 'bg-rose-500/20 text-rose-400 group-hover:bg-rose-500/30'} p-3 rounded-lg group-hover:scale-110 transition-all duration-300`}>
                                 <ScaleIcon />
                             </div>
-                            <div>
+                            <div className="relative z-10">
                                 <p className="text-sm text-slate-400 font-medium">Your Balance (as {trip?.guests[0]?.name})</p>
                                 <p className={`text-xl font-bold ${balanceColor}`}>
                                     {balanceText}
@@ -1883,11 +2323,11 @@
                         </div>
 
                         {/* Top Spender */}
-                        <div className="glass-card p-5 rounded-2xl flex items-center gap-4">
-                            <div className="bg-amber-500/20 p-3 rounded-lg text-amber-400">
+                        <div className="glass-card carbon-card p-5 rounded-2xl flex items-center gap-4 group">
+                            <div className="bg-amber-500/20 p-3 rounded-lg text-amber-400 group-hover:scale-110 group-hover:bg-amber-500/30 transition-all duration-300">
                                 <StarIcon />
                             </div>
-                            <div>
+                            <div className="relative z-10 overflow-hidden">
                                 <p className="text-sm text-slate-400 font-medium">Top Spender</p>
                                 <p className="text-2xl font-bold text-white truncate">{dashboardStats.topSpender.name}</p>
                             </div>
@@ -1950,8 +2390,8 @@
             };
 
             return (
-                <div className="glass-card p-5 rounded-2xl">
-                    <div className="flex justify-between items-center mb-4">
+                <div className="glass-card carbon-card p-5 rounded-2xl">
+                    <div className="flex justify-between items-center mb-4 relative z-10">
                         <h2 className="text-2xl font-bold flex items-center gap-2 text-white">
                             <ChartBarIcon />
                             {filterId === 'All' ? 'Total Spending Over Time' : 'Individual Share Over Time'}
@@ -1973,16 +2413,16 @@
                         </div>
                     </div>
                     {data.length > 0 ? (
-                        <div className="h-56 flex flex-col">
+                        <div className="h-56 flex flex-col relative z-10">
                             <div className="flex-grow flex items-end gap-2 border-b border-slate-700 pb-2">
                                 {data.map((item, index) => (
                                     <div key={index} className="relative flex-1 h-full flex items-end justify-center group">
                                         <div 
-                                            className="w-3/4 bg-cyan-500 rounded-t-md hover:bg-cyan-400 transition-colors"
+                                            className="w-3/4 bg-gradient-to-t from-blue-600 to-cyan-400 rounded-t-md group-hover:opacity-80 transition-all duration-300"
                                             style={{ height: `${(item.amount / maxAmount) * 100}%` }}
                                         >
                                         </div>
-                                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-slate-900/80 text-white text-xs font-bold py-1 px-2 rounded-md whitespace-nowrap">
+                                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 group-hover:-translate-y-2 transition-all duration-300 bg-slate-900/90 backdrop-blur-sm text-white text-xs font-bold py-1 px-2 rounded-md whitespace-nowrap shadow-lg">
                                             ₹{item.amount.toFixed(2)}
                                         </div>
                                     </div>
@@ -1990,14 +2430,14 @@
                             </div>
                             <div className="flex items-start gap-2 pt-2 text-xs text-slate-400">
                                  {data.map((item, index) => (
-                                    <div key={index} className="flex-1 text-center">
+                                    <div key={index} className="flex-1 text-center font-medium">
                                         {formatDate(item.date)}
                                     </div>
                                  ))}
                             </div>
                         </div>
                     ) : (
-                        <div className="h-56 flex items-center justify-center text-slate-400">
+                        <div className="h-56 flex items-center justify-center text-slate-400 relative z-10">
                             No spending data found for this selection.
                         </div>
                     )}
@@ -2055,7 +2495,7 @@
                             value={description}
                             onChange={e => setDescription(e.target.value)}
                             placeholder="Expense Description"
-                            className="w-full p-2 bg-slate-700/50 border border-slate-600 rounded-md text-white focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
+                            className="w-full p-2 bg-slate-700/50 border border-slate-600 rounded-md text-white focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-all"
                         />
                         <div className="grid grid-cols-2 gap-2">
                              <input
@@ -2063,13 +2503,13 @@
                                 value={amount}
                                 onChange={e => setAmount(e.target.value)}
                                 placeholder="Amount (₹)"
-                                className="w-full p-2 bg-slate-700/50 border border-slate-600 rounded-md text-white focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
+                                className="w-full p-2 bg-slate-700/50 border border-slate-600 rounded-md text-white focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-all"
                             />
-                             <select value={paidById} onChange={e => setPaidById(e.target.value)} className="w-full p-2 bg-slate-700/50 border border-slate-600 rounded-md text-white focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500">
+                             <select value={paidById} onChange={e => setPaidById(e.target.value)} className="w-full p-2 bg-slate-700/50 border border-slate-600 rounded-md text-white focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-all">
                                 {guests.map(g => <option key={g.id} value={g.id}>{g.name} paid</option>)}
                             </select>
                         </div>
-                        {error && <p className="text-xs text-rose-400">{error}</p>}
+                        {error && <p className="text-xs text-rose-400 animate-fadeInUp">{error}</p>}
                         <div className="flex gap-2 pt-2">
                              <button onClick={handleQuickAdd} className="w-full bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-400 hover:to-green-400 text-white font-bold py-2 px-3 rounded-lg shadow-lg shadow-emerald-500/30 transition-all transform hover:-translate-y-1 hover:shadow-xl hover:shadow-emerald-500/40 active:scale-95 flex items-center justify-center gap-2 text-sm">
                                 Add
@@ -2091,7 +2531,7 @@
 
             return (
                 <div 
-                    className={`rounded-full flex items-center justify-center font-bold text-white flex-shrink-0 ${sizeClasses[size]}`}
+                    className={`rounded-full flex items-center justify-center font-bold text-white flex-shrink-0 shadow-sm ${sizeClasses[size]}`}
                     style={{ backgroundColor: generateAvatarColor(name) }}
                 >
                     {getInitials(name)}
@@ -2119,12 +2559,12 @@
             return (
                 <ul className="space-y-4 max-h-60 overflow-y-auto pr-2 relative">
                     <div className="absolute left-[5px] top-0 h-full w-0.5 bg-slate-700/50"></div>
-                    {history.map(log => (
-                        <li key={log.id} className="flex items-start gap-4 text-sm relative pl-4">
-                            <div className="absolute left-0 top-1 w-3 h-3 bg-slate-600 rounded-full border-2 border-slate-900"></div>
-                            <div>
+                    {history.map((log, i) => (
+                        <li key={log.id} className="flex items-start gap-4 text-sm relative pl-4 animate-fadeInUp" style={{animationDelay: `${i * 0.1}s`, opacity: 0}}>
+                            <div className="absolute left-0 top-1 w-3 h-3 bg-slate-600 rounded-full border-2 border-slate-900 z-10"></div>
+                            <div className="interactive-item w-full p-2 -my-2 rounded-md hover:bg-slate-800/50">
                                 <p className="text-slate-300">{log.message}</p>
-                                <p className="text-xs text-slate-500">{formatTimeAgo(log.timestamp)}</p>
+                                <p className="text-xs text-slate-500 font-medium">{formatTimeAgo(log.timestamp)}</p>
                             </div>
                         </li>
                     ))}
@@ -2144,7 +2584,7 @@
             let cumulativeAngle = 0;
 
             return (
-                <svg viewBox="0 0 120 120" className="w-40 h-40 flex-shrink-0">
+                <svg viewBox="0 0 120 120" className="w-40 h-40 flex-shrink-0 drop-shadow-xl">
                     <g transform="rotate(-90 60 60)">
                         {data.map(item => {
                             const total = data.reduce((sum, i) => sum + i.amount, 0);
@@ -2169,8 +2609,9 @@
                                     style={{ 
                                         transform: `rotate(${rotation}deg)`, 
                                         transformOrigin: '50% 50%', 
-                                        transition: 'stroke-dashoffset 0.8s cubic-bezier(0.5, 0, 0.5, 1)' 
+                                        transition: 'stroke-dashoffset 1.2s cubic-bezier(0.34, 1.56, 0.64, 1)' 
                                     }}
+                                    className="hover:opacity-80 transition-opacity cursor-pointer"
                                 />
                             );
                         })}
@@ -2181,11 +2622,11 @@
 
         function ChartLegend({ data }) {
             return (
-                <ul className="space-y-2 flex-grow">
+                <ul className="space-y-2 flex-grow w-full">
                     {data.map(item => (
-                        <li key={item.name} className="flex items-center justify-between text-sm">
+                        <li key={item.name} className="flex items-center justify-between text-sm p-2 rounded-lg hover:bg-slate-800/50 transition-colors interactive-item cursor-pointer">
                             <div className="flex items-center gap-2">
-                                <span className="block w-3 h-3 rounded-full" style={{ backgroundColor: CATEGORY_COLORS[item.name] }}></span>
+                                <span className="block w-3 h-3 rounded-full shadow-sm" style={{ backgroundColor: CATEGORY_COLORS[item.name] }}></span>
                                 <span className="font-semibold text-slate-300">{item.name}</span>
                             </div>
                             <span className="font-bold text-slate-200">₹{item.amount.toFixed(2)}</span>
@@ -2235,7 +2676,7 @@
                     onClick={handleClose}
                 >
                     <div 
-                        className={`glass-modal rounded-xl shadow-xl w-full max-w-md p-6 transform transition-all duration-300 ${isAnimating ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}
+                        className={`glass-modal rounded-xl shadow-xl w-full max-w-md p-6 transform transition-all duration-400 cubic-bezier(0.34, 1.56, 0.64, 1) ${isAnimating ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`}
                         onClick={e => e.stopPropagation()}
                     >
                         <h2 className="text-2xl font-bold mb-4 text-white">{tripToEdit ? 'Edit Trip' : 'Start a New Trip'}</h2>
@@ -2247,7 +2688,7 @@
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
                                     placeholder="e.g., Goa Adventure, Weekend Getaway"
-                                    className="w-full p-2 bg-slate-700/50 border border-slate-600 rounded-md focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-white"
+                                    className="w-full p-2 bg-slate-700/50 border border-slate-600 rounded-md focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-white transition-all"
                                     autoFocus
                                 />
                             </div>
@@ -2257,12 +2698,12 @@
                                     type="date"
                                     value={date}
                                     onChange={(e) => setDate(e.target.value)}
-                                    className="w-full p-2 bg-slate-700/50 border border-slate-600 rounded-md focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-white"
+                                    className="w-full p-2 bg-slate-700/50 border border-slate-600 rounded-md focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-white transition-all"
                                 />
                             </div>
                             <div className="flex justify-end gap-4 mt-6">
-                                <button type="button" onClick={handleClose} className="py-2 px-4 bg-slate-700 hover:bg-slate-600 rounded-md font-semibold transition-all active:scale-95 text-white">Cancel</button>
-                                <button type="submit" className="py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md font-semibold transition-all active:scale-95 shadow-lg shadow-indigo-500/30">{tripToEdit ? 'Save Changes' : 'Start Trip'}</button>
+                                <button type="button" onClick={handleClose} className="py-2 px-4 bg-slate-700 hover:bg-slate-600 rounded-md font-semibold transition-all active:scale-95 text-white hover:-translate-y-0.5">Cancel</button>
+                                <button type="submit" className="py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md font-semibold transition-all active:scale-95 shadow-lg shadow-indigo-500/30 hover:-translate-y-0.5 hover:shadow-indigo-500/50">{tripToEdit ? 'Save Changes' : 'Start Trip'}</button>
                             </div>
                         </form>
                     </div>
@@ -2327,7 +2768,7 @@
                     onClick={handleClose}
                 >
                     <div 
-                        className={`glass-modal rounded-xl shadow-xl w-full max-w-md p-6 transform transition-all duration-300 ${isAnimating ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}
+                        className={`glass-modal rounded-xl shadow-xl w-full max-w-md p-6 transform transition-all duration-400 cubic-bezier(0.34, 1.56, 0.64, 1) ${isAnimating ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`}
                         onClick={e => e.stopPropagation()}
                     >
                         <h2 className="text-2xl font-bold mb-4 text-white">{guestToEdit ? 'Edit Guest Name' : 'Add a New Guest'}</h2>
@@ -2337,13 +2778,13 @@
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
                                 placeholder="Enter guest's name"
-                                className="w-full p-2 bg-slate-700/50 border border-slate-600 rounded-md focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-white"
+                                className="w-full p-2 bg-slate-700/50 border border-slate-600 rounded-md focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-white transition-all"
                                 autoFocus
                             />
-                            {error && <p className="text-rose-400 text-sm mt-2">{error}</p>}
+                            {error && <p className="text-rose-400 text-sm mt-2 animate-fadeInUp">{error}</p>}
                             <div className="flex justify-end gap-4 mt-6">
-                                <button type="button" onClick={handleClose} className="py-2 px-4 bg-slate-700 hover:bg-slate-600 rounded-md font-semibold transition-all active:scale-95 text-white">Cancel</button>
-                                <button type="submit" className="py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md font-semibold transition-all active:scale-95 shadow-lg shadow-indigo-500/30">{guestToEdit ? 'Save Changes' : 'Add Guest'}</button>
+                                <button type="button" onClick={handleClose} className="py-2 px-4 bg-slate-700 hover:bg-slate-600 rounded-md font-semibold transition-all active:scale-95 text-white hover:-translate-y-0.5">Cancel</button>
+                                <button type="submit" className="py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md font-semibold transition-all active:scale-95 shadow-lg shadow-indigo-500/30 hover:-translate-y-0.5 hover:shadow-indigo-500/50">{guestToEdit ? 'Save Changes' : 'Add Guest'}</button>
                             </div>
                         </form>
                     </div>
@@ -2459,34 +2900,34 @@
                     onClick={handleClose}
                 >
                     <div 
-                        className={`glass-modal rounded-xl shadow-xl w-full max-w-lg p-6 my-8 transform transition-all duration-300 ${isAnimating ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}
+                        className={`glass-modal rounded-xl shadow-2xl w-full max-w-lg p-6 my-8 transform transition-all duration-400 cubic-bezier(0.34, 1.56, 0.64, 1) ${isAnimating ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-10 opacity-0 scale-95'}`}
                         onClick={e => e.stopPropagation()}
                     >
                         <h2 className="text-2xl font-bold mb-6 text-white">{expenseToEdit ? 'Edit Expense' : 'Add an Expense'}</h2>
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div>
                                 <label className="block font-semibold mb-1 text-slate-300">Description</label>
-                                <input type="text" value={description} onChange={e => setDescription(e.target.value)} placeholder="e.g., Dinner, Groceries" className="w-full p-2 bg-slate-700/50 border border-slate-600 rounded-md text-white" />
+                                <input type="text" value={description} onChange={e => setDescription(e.target.value)} placeholder="e.g., Dinner, Groceries" className="w-full p-2 bg-slate-700/50 border border-slate-600 rounded-md text-white transition-all focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500" />
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
                                    <label className="block font-semibold mb-1 text-slate-300">Amount (₹)</label>
-                                   <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" className="w-full p-2 bg-slate-700/50 border border-slate-600 rounded-md text-white" min="0.01" step="0.01" />
+                                   <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" className="w-full p-2 bg-slate-700/50 border border-slate-600 rounded-md text-white transition-all focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500" min="0.01" step="0.01" />
                                 </div>
                                  <div>
                                     <label className="block font-semibold mb-1 text-slate-300">Category</label>
-                                    <select value={category} onChange={e => setCategory(e.target.value)} className="w-full p-2 bg-slate-700/50 border border-slate-600 rounded-md text-white">
+                                    <select value={category} onChange={e => setCategory(e.target.value)} className="w-full p-2 bg-slate-700/50 border border-slate-600 rounded-md text-white transition-all focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500">
                                         {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                                     </select>
                                 </div>
                             </div>
                              <div>
                                 <label className="block font-semibold mb-1 text-slate-300">Date</label>
-                                <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full p-2 bg-slate-700/50 border border-slate-600 rounded-md text-white" />
+                                <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full p-2 bg-slate-700/50 border border-slate-600 rounded-md text-white transition-all focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500" />
                             </div>
                             <div>
                                 <label className="block font-semibold mb-1 text-slate-300">Paid by</label>
-                                <select value={paidById} onChange={e => setPaidById(e.target.value)} className="w-full p-2 bg-slate-700/50 border border-slate-600 rounded-md text-white">
+                                <select value={paidById} onChange={e => setPaidById(e.target.value)} className="w-full p-2 bg-slate-700/50 border border-slate-600 rounded-md text-white transition-all focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500">
                                     <option value="" disabled>Select a person</option>
                                     {guests.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
                                 </select>
@@ -2495,30 +2936,30 @@
                                 <label className="block font-semibold mb-2 text-slate-300">Split</label>
                                 <div className="flex items-center gap-4 mb-3 bg-slate-700/50 rounded-lg p-1">
                                     {['equally', 'amounts', 'percentages'].map(type => (
-                                        <button key={type} type="button" onClick={() => setSplitType(type)} className={`flex-1 py-1 px-2 text-sm rounded-md capitalize transition-all active:scale-95 ${splitType === type ? 'bg-cyan-500 text-white' : 'bg-transparent text-slate-300 hover:bg-slate-600'}`}>
+                                        <button key={type} type="button" onClick={() => setSplitType(type)} className={`flex-1 py-1 px-2 text-sm rounded-md capitalize transition-all active:scale-95 ${splitType === type ? 'bg-cyan-500 text-white shadow-md' : 'bg-transparent text-slate-300 hover:bg-slate-600'}`}>
                                             {type}
                                         </button>
                                     ))}
                                 </div>
                                 <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                                     {guests.map(g => (
-                                        <div key={g.id} className={`flex items-center gap-2 p-2 rounded-md transition-colors ${splitWith.includes(g.id) ? 'bg-cyan-500/20' : 'bg-slate-700/30'}`}>
+                                        <div key={g.id} className={`flex items-center gap-2 p-2 rounded-md transition-all duration-300 ${splitWith.includes(g.id) ? 'bg-cyan-500/20' : 'bg-slate-700/30'} interactive-item hover:-translate-y-0.5`}>
                                             <input 
                                                 type="checkbox" 
                                                 checked={splitWith.includes(g.id)} 
                                                 onChange={() => setSplitWith(prev => prev.includes(g.id) ? prev.filter(id => id !== g.id) : [...prev, g.id])}
-                                                className="h-4 w-4 rounded bg-slate-600 border-slate-500 text-cyan-500 focus:ring-cyan-500" 
+                                                className="h-4 w-4 rounded bg-slate-600 border-slate-500 text-cyan-500 focus:ring-cyan-500 transition-colors" 
                                             />
                                             <Avatar name={g.name} size="sm" />
                                             <label className="flex-1 cursor-pointer text-slate-200">{g.name}</label>
                                             {splitType !== 'equally' && splitWith.includes(g.id) && (
-                                                <div className="relative">
+                                                <div className="relative animate-fadeInUp" style={{animationDuration: '0.3s'}}>
                                                     {splitType === 'amounts' && <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400">₹</span>}
                                                     <input 
                                                         type="number" 
                                                         value={splitDetails[g.id] || ''}
                                                         onChange={(e) => handleDetailChange(g.id, e.target.value)}
-                                                        className={`w-24 p-1 border rounded-md bg-slate-800 border-slate-600 text-white ${splitType === 'amounts' ? 'pl-5' : 'pr-5'}`}
+                                                        className={`w-24 p-1 border rounded-md bg-slate-800 border-slate-600 text-white transition-all focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 ${splitType === 'amounts' ? 'pl-5' : 'pr-5'}`}
                                                         placeholder="0.00"
                                                         min="0"
                                                         step="0.01"
@@ -2535,10 +2976,10 @@
                                     </div>
                                 )}
                             </div>
-                            {error && <p className="text-rose-400 text-sm font-semibold">{error}</p>}
+                            {error && <p className="text-rose-400 text-sm font-semibold animate-fadeInUp">{error}</p>}
                             <div className="flex justify-end gap-4 pt-4">
-                                <button type="button" onClick={handleClose} className="py-2 px-4 bg-slate-700 hover:bg-slate-600 rounded-md font-semibold transition-all active:scale-95 text-white">Cancel</button>
-                                <button type="submit" className="py-2 px-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-md font-semibold transition-all active:scale-95">
+                                <button type="button" onClick={handleClose} className="py-2 px-4 bg-slate-700 hover:bg-slate-600 rounded-md font-semibold transition-all active:scale-95 text-white hover:-translate-y-0.5">Cancel</button>
+                                <button type="submit" className="py-2 px-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-md font-semibold transition-all active:scale-95 shadow-lg shadow-emerald-500/30 hover:-translate-y-0.5 hover:shadow-emerald-500/50">
                                     {expenseToEdit ? 'Save Changes' : 'Add Expense'}
                                 </button>
                             </div>
@@ -2577,7 +3018,7 @@
                     onClick={handleClose}
                 >
                     <div 
-                        className={`glass-modal rounded-xl shadow-xl w-full max-w-md p-6 transform transition-all duration-300 ${isAnimating ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}
+                        className={`glass-modal rounded-xl shadow-2xl w-full max-w-md p-6 transform transition-all duration-400 cubic-bezier(0.34, 1.56, 0.64, 1) ${isAnimating ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`}
                         onClick={e => e.stopPropagation()}
                     >
                         <h3 className="text-xl font-bold mb-4 text-white">{title}</h3>
@@ -2585,13 +3026,13 @@
                         <div className="flex justify-end gap-4">
                             <button 
                                 onClick={handleClose} 
-                                className="py-2 px-5 bg-slate-700 hover:bg-slate-600 text-white rounded-md font-semibold transition-all active:scale-95"
+                                className="py-2 px-5 bg-slate-700 hover:bg-slate-600 text-white rounded-md font-semibold transition-all active:scale-95 hover:-translate-y-0.5"
                             >
                                 {cancelButtonText || 'Cancel'}
                             </button>
                             <button 
                                 onClick={handleConfirm} 
-                                className={`py-2 px-5 text-white rounded-md font-semibold transition-all active:scale-95 ${isDestructive ? 'bg-red-600 hover:bg-red-700 shadow-lg shadow-red-500/30' : 'bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-500/30'}`}
+                                className={`py-2 px-5 text-white rounded-md font-semibold transition-all active:scale-95 hover:-translate-y-0.5 ${isDestructive ? 'bg-red-600 hover:bg-red-700 shadow-lg shadow-red-500/30 hover:shadow-red-500/50' : 'bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50'}`}
                             >
                                 {confirmButtonText}
                             </button>
