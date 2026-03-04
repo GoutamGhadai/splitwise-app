@@ -1683,6 +1683,8 @@
                     const tripGuestMap = trip.guests.reduce((acc, g) => ({...acc, [g.id]: g.name.trim()}), {});
 
                     trip.expenses.forEach(exp => {
+                        if (exp.isSettlement) return; // Exclude settlements from charts
+                        
                         const dateObj = new Date(exp.date);
                         const monthKey = dateObj.toLocaleString('en-US', { month: 'short', year: 'numeric' });
                         const yearKey = dateObj.getFullYear().toString();
@@ -1789,6 +1791,8 @@
                 filteredTrips.forEach(trip => {
                     const tripMap = trip.guests.reduce((acc, g) => ({...acc, [g.id]: g.name.trim()}), {});
                     trip.expenses.forEach(exp => {
+                        if (exp.isSettlement) return; // Exclude settlements from KPIs
+                        
                         const amt = parseFloat(exp.amount) || 0;
                         totalSpend += amt;
                         
