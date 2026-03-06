@@ -89,6 +89,17 @@
             pointer-events: none;
         }
 
+        /* Specific Carbon Texture for Trip Tiles */
+        .trip-card-texture {
+            background-color: #0f172a !important; 
+            background-image: 
+                linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.95) 100%),
+                repeating-linear-gradient(45deg, rgba(0,0,0,0.25) 0, rgba(0,0,0,0.25) 2px, transparent 2px, transparent 4px),
+                repeating-linear-gradient(-45deg, rgba(255,255,255,0.03) 0, rgba(255,255,255,0.03) 2px, transparent 2px, transparent 4px) !important;
+            border: 1px solid rgba(255, 255, 255, 0.12) !important;
+            box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05), 0 8px 24px rgba(0, 0, 0, 0.6) !important;
+        }
+
         .glass-modal {
             background: rgba(15, 23, 42, 0.85);
             backdrop-filter: blur(20px);
@@ -107,6 +118,8 @@
             box-shadow: 0 12px 24px -8px rgba(0,0,0,0.4);
             z-index: 10;
         }
+
+        .avatar-ring { border: 2px solid #0f172a; }
 
         /* Custom scrollbar */
         ::-webkit-scrollbar { width: 6px; }
@@ -150,6 +163,16 @@
         .light .carbon-card::before {
             background: radial-gradient(circle at top right, rgba(250, 204, 21, 0.05), transparent 50%);
         }
+        
+        .light .trip-card-texture {
+            background-color: #fdfbf7 !important; 
+            background-image: 
+                linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(245, 240, 230, 0.95) 100%),
+                repeating-linear-gradient(45deg, rgba(139, 107, 74, 0.05) 0, rgba(139, 107, 74, 0.05) 2px, transparent 2px, transparent 4px),
+                repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.6) 0, rgba(255, 255, 255, 0.6) 2px, transparent 2px, transparent 4px) !important;
+            border: 1px solid rgba(212, 196, 175, 0.8) !important;
+            box-shadow: inset 0 1px 3px rgba(255, 255, 255, 1), 0 8px 24px rgba(139, 107, 74, 0.1) !important;
+        }
 
         .light .glass-modal {
             background: rgba(255, 253, 249, 0.95);
@@ -163,6 +186,8 @@
         .light .interactive-item:hover {
             box-shadow: 0 12px 24px -8px rgba(139, 107, 74, 0.25);
         }
+        
+        .light .avatar-ring { border-color: #fdfbf7; }
 
         /* Light theme text overrides */
         .light .text-white { color: #29211a !important; }
@@ -344,6 +369,69 @@
             return { transactions };
         };
 
+        const getTripProgress = (trip) => {
+            if (!trip || trip.expenses.length === 0) return { remaining: 0, progress: 0, isSettled: false, isNew: true };
+            if (trip.guests.length < 2) return { remaining: 0, progress: 100, isSettled: true, isNew: false };
+            
+            const balances = trip.guests.reduce((acc, guest) => ({ ...acc, [guest.id]: 0 }), {});
+            
+            trip.expenses.forEach(expense => {
+                if (expense.isSettlement) return; // Ignore settlements for initial debt
+                const totalAmount = parseFloat(expense.amount);
+                if (balances[expense.paidById] !== undefined) balances[expense.paidById] += totalAmount;
+
+                if (expense.splitType === 'amounts') {
+                    Object.entries(expense.splitDetails || {}).forEach(([guestId, amount]) => {
+                        if (balances[guestId] !== undefined) balances[guestId] -= parseFloat(amount);
+                    });
+                } else if (expense.splitType === 'percentages') {
+                    Object.entries(expense.splitDetails || {}).forEach(([guestId, percentage]) => {
+                        if (balances[guestId] !== undefined) balances[guestId] -= totalAmount * (parseFloat(percentage) / 100);
+                    });
+                } else {
+                    if (expense.splitWith.length > 0) {
+                        const share = totalAmount / expense.splitWith.length;
+                        expense.splitWith.forEach(guestId => {
+                            if (balances[guestId] !== undefined) balances[guestId] -= share;
+                        });
+                    }
+                }
+            });
+
+            let totalInitialDebt = 0;
+            Object.values(balances).forEach(balance => {
+                if (balance > 0.01) totalInitialDebt += balance;
+            });
+
+            const currentSettlement = calculateSettlement(trip);
+            const remainingDebt = currentSettlement.transactions.reduce((sum, t) => sum + t.amount, 0);
+
+            let progress = 100;
+            if (totalInitialDebt > 0.01) {
+                 progress = Math.max(0, Math.min(100, ((totalInitialDebt - remainingDebt) / totalInitialDebt) * 100));
+            }
+
+            return { 
+                remaining: remainingDebt, 
+                progress: remainingDebt < 0.01 ? 100 : progress, 
+                isSettled: remainingDebt < 0.01, 
+                totalInitialDebt,
+                isNew: false
+            };
+        };
+
+        const getTripGradient = (name) => {
+            const gradients = [
+                'from-sky-400 to-indigo-500',
+                'from-emerald-400 to-teal-500',
+                'from-violet-400 to-fuchsia-500',
+                'from-rose-400 to-orange-500',
+                'from-amber-400 to-yellow-500'
+            ];
+            const sum = name.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
+            return gradients[sum % gradients.length];
+        }
+
 
         // --- SVG Icons ---
         const PlusIcon = () => (
@@ -479,7 +567,7 @@
             // --- State Management ---
             const [trips, setTrips] = useState([]);
             const [activeTripId, setActiveTripId] = useState(null);
-            const [expandedTripId, setExpandedTripId] = useState(null);
+            const [tripTab, setTripTab] = useState('Active'); // 'Active', 'Settled', 'All'
             const [theme, setTheme] = useState('light');
             const [filterPaidBy, setFilterPaidBy] = useState('All');
             const [expenseSearchQuery, setExpenseSearchQuery] = useState('');
@@ -490,6 +578,8 @@
             const [isTourOpen, setIsTourOpen] = useState(false);
             const [isDataModalOpen, setIsDataModalOpen] = useState(false);
             const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
+            const [detailExpenseId, setDetailExpenseId] = useState(null);
+            const [expandedTripId, setExpandedTripId] = useState(null); // Used for accordion now
             const [tourStep, setTourStep] = useState(0);
             const [isUpdateExpensesModalOpen, setUpdateExpensesModalOpen] = useState(false);
             const [editingTrip, setEditingTrip] = useState(null);
@@ -650,21 +740,6 @@
                         return t;
                     })
                 );
-            };
-            
-            const handleTogglePaid = (tripId, settlementKey) => {
-                setTrips(prevTrips => prevTrips.map(trip => {
-                    if (trip.id === tripId) {
-                        const newPaidSettlements = { ...(trip.paidSettlements || {}) };
-                        if (newPaidSettlements[settlementKey]) {
-                            delete newPaidSettlements[settlementKey];
-                        } else {
-                            newPaidSettlements[settlementKey] = true;
-                        }
-                        return { ...trip, paidSettlements: newPaidSettlements };
-                    }
-                    return trip;
-                }));
             };
 
             const fallbackCopyTextToClipboard = (text, tripId) => {
@@ -905,6 +980,21 @@
             // --- Derived State & Calculations (Memoized for performance) ---
             const activeTrip = useMemo(() => trips.find(t => t.id === activeTripId), [trips, activeTripId]);
 
+            // PERFORMANCE OPTIMIZATION: Pre-calculate all expensive home screen data once
+            const filteredHomeTrips = useMemo(() => {
+                return trips.map(trip => {
+                    const progressData = getTripProgress(trip);
+                    const totalSpend = trip.expenses.reduce((sum, exp) => exp.isSettlement ? sum : sum + parseFloat(exp.amount), 0);
+                    const tripGuestMap = trip.guests.reduce((acc, g) => ({...acc, [g.id]: g.name}), {});
+                    return { ...trip, progressData, totalSpend, tripGuestMap };
+                }).filter(trip => {
+                    const { isSettled, isNew } = trip.progressData;
+                    if (tripTab === 'Active') return !isSettled || isNew;
+                    if (tripTab === 'Settled') return isSettled && !isNew;
+                    return true; // 'All'
+                });
+            }, [trips, tripTab]);
+
             const settlement = useMemo(() => calculateSettlement(activeTrip), [activeTrip]);
 
             const filteredExpenses = useMemo(() => {
@@ -928,8 +1018,6 @@
             const guestToEdit = useMemo(() => 
                 activeTrip?.guests.find(g => g.id === editingGuestId), 
             [activeTrip, editingGuestId]);
-
-            // Removed spendingOverTime calculation from App as it is now moved to SpendingChart component
 
             const guestSummaries = useMemo(() => {
                 if (!activeTrip) return {};
@@ -1082,124 +1170,221 @@
                                 <QuestionMarkIcon />
                             </button>
                         </div>
-                        <div className="w-full max-w-2xl text-center">
-                            <h1 className="text-5xl font-bold text-white mb-3 animate-fadeInUp">ShareFare</h1>
-                            <p className="text-lg text-slate-300 mb-10 animate-fadeInUp" style={{animationDelay: '0.2s'}}>Select a trip to manage or start a new one.</p>
-                            <div className="animate-fadeInUp" style={{animationDelay: '0.4s'}}>
-                                <button data-tour="add-trip-button" onClick={() => { setEditingTrip(null); setTripModalOpen(true); }} className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white font-bold py-3 px-6 rounded-lg shadow-lg shadow-cyan-500/30 transition-all transform hover:-translate-y-1 hover:shadow-xl hover:shadow-cyan-500/50 active:scale-95 flex items-center justify-center gap-2 text-lg mx-auto">
+                        <div className="w-full max-w-4xl text-center py-10">
+                            <h1 className="text-5xl sm:text-6xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 mb-4 animate-fadeInUp">ShareFare</h1>
+                            <p className="text-lg text-slate-400 mb-10 animate-fadeInUp" style={{animationDelay: '0.2s'}}>Select a trip to manage or start a new one.</p>
+                            
+                            <div className="animate-fadeInUp mb-12" style={{animationDelay: '0.4s'}}>
+                                <button data-tour="add-trip-button" onClick={() => { setEditingTrip(null); setTripModalOpen(true); }} className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white font-bold py-3 px-8 rounded-full shadow-lg shadow-cyan-500/30 transition-all transform hover:-translate-y-1 hover:shadow-xl hover:shadow-cyan-500/50 active:scale-95 flex items-center justify-center gap-2 text-lg mx-auto">
                                     <PlusIcon />
-                                    Add Trip/Event
+                                    Add Trip / Event
                                 </button>
                             </div>
-                            <div data-tour="trip-list" className="mt-12 space-y-6">
-                                {trips.length > 0 ? trips.map((trip, index) => {
-                                    const { transactions } = calculateSettlement(trip);
-                                    const tripGuestMap = trip.guests.reduce((map, guest) => ({...map, [guest.id]: guest.name}), {});
 
-                                    return (
-                                        <div key={trip.id} className="glass-card rounded-xl overflow-hidden interactive-item" style={{animation: `fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) ${index * 0.1}s forwards`, opacity: 0}}>
-                                            <div className="p-4 flex justify-between items-center cursor-pointer" onClick={() => setExpandedTripId(prevId => prevId === trip.id ? null : trip.id)}>
-                                                <div>
-                                                    <h2 className="font-bold text-xl text-left text-white">{trip.name}</h2>
-                                                    <p className="text-sm text-slate-300 text-left">
-                                                        On: {new Date(trip.date).toLocaleDateString()} | {trip.guests.length} guests, {trip.expenses.length} expenses
-                                                    </p>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <button onClick={(e) => { e.stopPropagation(); handleEditTrip(trip); }} className="text-slate-300 hover:text-cyan-400 p-2 rounded-full hover:bg-white/10 transition-all active:scale-90">
-                                                        <EditIcon />
-                                                    </button>
-                                                    <button onClick={(e) => { e.stopPropagation(); setActionTargetId(trip.id); setConfirmAction('deleteTrip'); }} className="text-slate-300 hover:text-rose-400 p-2 rounded-full hover:bg-white/10 transition-all active:scale-90">
-                                                        <TrashIcon />
-                                                    </button>
-                                                    <button onClick={(e) => { e.stopPropagation(); setActiveTripId(trip.id); }} className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white font-semibold py-2 px-4 rounded-lg transition-all active:scale-95 shadow-lg shadow-cyan-500/30">
-                                                        Open
-                                                    </button>
-                                                </div>
-                                            </div>
-                                            {expandedTripId === trip.id && (
-                                                <div className="p-4 border-t border-white/10 bg-black/20 animate-fadeInUp">
-                                                    <div className="flex justify-between items-center mb-2">
-                                                        <h3 className="text-lg font-semibold text-left text-slate-300">Settlement Plan</h3>
-                                                        {transactions.length > 0 && (
-                                                            <button 
-                                                                onClick={(e) => { e.stopPropagation(); handleCopySummary(trip); }}
-                                                                className="flex items-center gap-1.5 text-sm font-semibold py-1 px-2 rounded-md bg-slate-600 hover:bg-slate-500 transition-all active:scale-95 text-white"
-                                                            >
-                                                                {copiedTripId === trip.id ? 'Copied!' : <CopyIcon/>}
-                                                                {copiedTripId === trip.id ? '' : 'Copy'}
-                                                            </button>
+                            {/* Trip Filtering Tabs */}
+                            {trips.length > 0 && (
+                                <div className="flex flex-wrap justify-center gap-3 mb-8 animate-fadeInUp" style={{animationDelay: '0.5s'}}>
+                                    {['Active', 'Settled', 'All'].map(tab => {
+                                         const isActive = tripTab === tab;
+                                         const isDark = theme === 'dark';
+                                         return (
+                                         <button 
+                                             key={tab}
+                                             onClick={() => setTripTab(tab)}
+                                             className={`px-6 py-2.5 rounded-full text-sm font-extrabold transition-all shadow-sm border-2 ${
+                                                 isActive 
+                                                 ? 'bg-cyan-500 text-white border-cyan-400 shadow-cyan-500/40 ring-2 ring-cyan-500/20' 
+                                                 : (isDark 
+                                                     ? 'bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-700 border-slate-700 hover:border-slate-500' 
+                                                     : 'bg-white text-slate-700 hover:text-slate-900 hover:bg-slate-50 border-slate-300 hover:border-slate-400 shadow-sm')
+                                             }`}
+                                         >
+                                             {tab} Trips
+                                         </button>
+                                    )})}
+                                </div>
+                            )}
+
+                            <div data-tour="trip-list" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 text-left items-start">
+                                {trips.length > 0 ? (
+                                    filteredHomeTrips.length > 0 ? (
+                                        filteredHomeTrips.map((trip, index) => {
+                                            const progressData = trip.progressData;
+                                            const gradientClass = getTripGradient(trip.name);
+                                            const displayedGuests = trip.guests.slice(0, 4);
+                                            const extraGuests = trip.guests.length - 4;
+                                            const isDark = theme === 'dark';
+                                            
+                                            const isExpanded = expandedTripId === trip.id;
+                                            // Only calculate settlement if the tile is expanded to save resources
+                                            const localSettlement = isExpanded ? calculateSettlement(trip) : null;
+
+                                            return (
+                                                <div 
+                                                    key={trip.id} 
+                                                    className={`glass-card trip-card-texture rounded-2xl overflow-hidden interactive-item flex flex-col cursor-pointer relative h-fit ${isExpanded ? 'ring-2 ring-cyan-500/50 shadow-cyan-500/20' : ''}`} 
+                                                    style={{animation: `fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) ${index * 0.1}s forwards`, opacity: 0}} 
+                                                    onClick={() => setExpandedTripId(prev => prev === trip.id ? null : trip.id)} 
+                                                    title={isExpanded ? "Click to collapse" : "Click to view Settlement Plan"}
+                                                >
+                                                    {/* Accent color bar top */}
+                                                    <div className={`absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r ${gradientClass}`}></div>
+                                                    
+                                                    <div className="p-5 flex-grow flex flex-col justify-between relative z-10 mt-1">
+                                                        <div>
+                                                            <div className="flex justify-between items-start gap-4 mb-2">
+                                                                <div className="flex-grow min-w-0">
+                                                                    <h2 className={`font-extrabold text-xl sm:text-2xl truncate ${isDark ? 'text-white' : 'text-slate-800'}`} title={trip.name}>{trip.name}</h2>
+                                                                    <p className={`text-xs sm:text-sm mt-1 font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{new Date(trip.date).toLocaleDateString()}</p>
+                                                                </div>
+                                                                <div className={`text-right shrink-0 ml-2 px-2 py-1 rounded-lg border ${isDark ? 'bg-slate-900/50 border-slate-700/50' : 'bg-slate-100/60 border-slate-300'}`}>
+                                                                    <p className={`text-[10px] uppercase tracking-wider font-semibold mb-0.5 ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>Total Cost</p>
+                                                                    <p className={`text-base sm:text-lg font-bold ${isDark ? 'text-cyan-400' : 'text-cyan-600'}`}>₹{trip.totalSpend.toFixed(0)}</p>
+                                                                </div>
+                                                            </div>
+                                                            
+                                                            <div className="flex items-center justify-between mb-6">
+                                                                {trip.guests.length > 0 ? (
+                                                                    <div className="flex -space-x-2.5 overflow-hidden p-1 -ml-1">
+                                                                        {displayedGuests.map(g => (
+                                                                            <div key={g.id} className="inline-block rounded-full avatar-ring shadow-sm z-10">
+                                                                                <Avatar name={g.name} size="sm" />
+                                                                            </div>
+                                                                        ))}
+                                                                        {extraGuests > 0 && (
+                                                                            <div className={`inline-flex items-center justify-center w-6 h-6 sm:w-8 sm:h-8 rounded-full avatar-ring text-[10px] sm:text-xs font-bold z-10 shadow-sm ${isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-200 text-slate-700'}`}>
+                                                                                +{extraGuests}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                ) : (
+                                                                    <span className={`text-xs italic ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>No guests</span>
+                                                                )}
+                                                                <span className={`text-xs font-medium px-2 py-1 rounded-md ${isDark ? 'text-slate-400 bg-black/20' : 'text-slate-600 bg-black/5'}`}>{trip.expenses.length} expenses</span>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Progress Bar Area */}
+                                                        {trip.expenses.length > 0 ? (
+                                                            <div className="mt-auto pt-2">
+                                                                <div className="flex justify-between items-end mb-1.5">
+                                                                    <span className={`text-xs font-bold ${progressData.isSettled ? (isDark ? 'text-emerald-400' : 'text-emerald-600') : (isDark ? 'text-slate-300' : 'text-slate-700')}`}>
+                                                                        {progressData.isSettled ? 'All Settled Up! 🎉' : `₹${progressData.remaining.toFixed(0)} remaining`}
+                                                                    </span>
+                                                                    <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded border ${isDark ? 'text-slate-400 bg-black/30 border-white/5' : 'text-slate-600 bg-black/5 border-black/5'}`}>{Math.round(progressData.progress)}% Settled</span>
+                                                                </div>
+                                                                <div className={`w-full h-1.5 rounded-full overflow-hidden shadow-inner border ${isDark ? 'bg-black/40 border-white/5' : 'bg-slate-200 border-black/5'}`}>
+                                                                    <div 
+                                                                        className={`h-full rounded-full transition-all duration-1000 ease-out ${progressData.isSettled ? 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.5)]' : (isDark ? 'bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.5)]' : 'bg-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.4)]')}`}
+                                                                        style={{width: `${progressData.progress}%`}}
+                                                                    ></div>
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="mt-auto pt-2">
+                                                                <div className={`text-xs font-bold mb-1.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>No expenses logged yet</div>
+                                                                <div className={`w-full h-1.5 rounded-full overflow-hidden border ${isDark ? 'bg-black/20 border-white/5' : 'bg-slate-100 border-black/5'}`}></div>
+                                                            </div>
                                                         )}
                                                     </div>
-                                                    {transactions.length > 0 ? (
-                                                        <ul className="space-y-2">
-                                                            {transactions.map((t, index) => {
-                                                                return (
-                                                                    <li key={index} className="flex items-center justify-between bg-slate-700/50 p-3 rounded-lg gap-2">
-                                                                        <p className={`flex-1 truncate text-sm`}>
-                                                                            <span className="font-bold text-cyan-400">{tripGuestMap[t.from]}</span>
-                                                                            <span className="text-slate-300"> owes </span>
-                                                                            <span className="font-bold text-emerald-400">{tripGuestMap[t.to]}</span>
-                                                                        </p>
-                                                                        <span className={`font-bold text-md text-white whitespace-nowrap`}>₹{t.amount.toFixed(2)}</span>
-                                                                    </li>
-                                                                );
-                                                            })}
-                                                        </ul>
-                                                    ) : (
-                                                        <p className="text-slate-300 text-left">All settled up!</p>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                }) : (
-                                    <div className="text-center pt-8 animate-fadeInUp" style={{animationDelay: '0.6s'}}>
-                                        <div className="flex justify-center mb-4">
-                                <SuitcaseIcon />
-                            </div>
-                            <p className="text-slate-400">You haven't created any trips yet.</p>
-                        </div>
-                    )}
-                </div>
-            </div>
-            <TourGuide 
-                isOpen={isTourOpen} 
-                onClose={handleCloseTour} 
-                activeTrip={activeTrip}
-                setActiveTripId={setActiveTripId}
-                trips={trips}
-                currentStep={tourStep}
-                setCurrentStep={setTourStep}
-            />
-            <TripModal isOpen={isTripModalOpen} onClose={() => setTripModalOpen(false)} onTripAction={handleTripAction} tripToEdit={editingTrip} />
-            <DataModal 
-                isOpen={isDataModalOpen} 
-                onClose={() => setIsDataModalOpen(false)} 
-                currentData={trips} 
-                onImport={handleImportData}
-            />
-            <AnalyticsModal 
-                isOpen={isAnalyticsOpen}
-                onClose={() => setIsAnalyticsOpen(false)}
-                trips={trips}
-                theme={theme}
-            />
-            <ConfirmationModal
-                isOpen={!!confirmAction}
-                onClose={handleModalClose}
-                onConfirm={handleConfirm}
-                            title={modalTitle}
-                            confirmButtonText={modalConfirmText}
-                            cancelButtonText={modalCancelText}
-                            isDestructive={isDestructive}
-                        >
-                            {modalBody}
-                        </ConfirmationModal>
-                    </div>
-                );
-            }
 
+                                                    {/* Accordion Settlement Plan */}
+                                                    <div className={`transition-all duration-500 ease-in-out overflow-hidden border-t ${isExpanded ? `max-h-[500px] opacity-100 ${isDark ? 'bg-slate-900/60 border-slate-700/50' : 'bg-slate-50/80 border-slate-200'}` : 'max-h-0 opacity-0 border-t-0'}`}>
+                                                        <div className="p-4">
+                                                            <div className="flex justify-between items-center mb-3">
+                                                                <h4 className={`text-xs uppercase tracking-wider font-bold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Settlement Plan</h4>
+                                                                <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 transform rotate-180 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+                                                            </div>
+                                                            {localSettlement?.transactions.length > 0 ? (
+                                                                <div className="space-y-2.5 max-h-48 overflow-y-auto pr-1 hide-scrollbar">
+                                                                    {localSettlement.transactions.map((t, idx) => (
+                                                                        <div key={idx} className={`flex justify-between items-center text-sm p-2.5 rounded-lg border ${isDark ? 'bg-slate-800/80 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+                                                                            <span className={`min-w-0 truncate mr-2 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                                                                                <span className={`font-bold ${isDark ? 'text-cyan-400' : 'text-cyan-600'}`}>{trip.tripGuestMap[t.from]}</span>
+                                                                                <span className="opacity-70 text-[11px] mx-1">owes</span>
+                                                                                <span className={`font-bold ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>{trip.tripGuestMap[t.to]}</span>
+                                                                            </span>
+                                                                            <span className={`font-bold shrink-0 ${isDark ? 'text-white' : 'text-slate-800'}`}>₹{t.amount.toFixed(2)}</span>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            ) : (
+                                                                <div className={`text-center py-4 rounded-lg border ${isDark ? 'bg-slate-800/50 border-slate-700/50' : 'bg-slate-100 border-slate-200'}`}>
+                                                                    <p className={`text-sm font-semibold mb-1 ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>🎉 All Settled</p>
+                                                                    <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>No pending debts for this trip.</p>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className={`flex justify-between items-center px-4 py-3 border-t relative z-10 ${isDark ? 'border-slate-700/50 bg-slate-900/40' : 'border-slate-200 bg-slate-100/50'}`}>
+                                                        <div className="flex items-center gap-1">
+                                                            <button onClick={(e) => { e.stopPropagation(); handleEditTrip(trip); }} className={`p-2 rounded-md transition-all active:scale-90 ${isDark ? 'text-slate-400 hover:text-cyan-400 hover:bg-slate-800' : 'text-slate-500 hover:text-cyan-600 hover:bg-slate-200'}`} title="Edit Trip Details">
+                                                                <EditIcon />
+                                                            </button>
+                                                            <button onClick={(e) => { e.stopPropagation(); setActionTargetId(trip.id); setConfirmAction('deleteTrip'); }} className={`p-2 rounded-md transition-all active:scale-90 ${isDark ? 'text-slate-400 hover:text-rose-400 hover:bg-slate-800' : 'text-slate-500 hover:text-rose-600 hover:bg-slate-200'}`} title="Delete Trip">
+                                                                <TrashIcon />
+                                                            </button>
+                                                        </div>
+                                                        <button onClick={(e) => { e.stopPropagation(); setActiveTripId(trip.id); }} className={`text-sm font-bold py-1.5 px-4 rounded-lg transition-all flex items-center gap-1.5 group shadow-sm ${isDark ? 'bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500 hover:text-white' : 'bg-cyan-100 text-cyan-700 hover:bg-cyan-500 hover:text-white'}`}>
+                                                            Open Trip
+                                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 transform group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })
+                                    ) : (
+                                        <div className="col-span-full text-center py-12 animate-fadeInUp">
+                                            <p className="text-slate-400 text-lg">No trips found in "{tripTab}".</p>
+                                        </div>
+                                    )
+                                ) : (
+                                    <div className="col-span-full text-center py-12 animate-fadeInUp" style={{animationDelay: '0.6s'}}>
+                                        <div className="flex justify-center mb-6 opacity-60">
+                                            <SuitcaseIcon />
+                                        </div>
+                                        <p className="text-slate-400 text-xl font-medium">You haven't created any trips yet.</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    <TourGuide 
+                        isOpen={isTourOpen} 
+                        onClose={handleCloseTour} 
+                        activeTrip={activeTrip}
+                        setActiveTripId={setActiveTripId}
+                        trips={trips}
+                        currentStep={tourStep}
+                        setCurrentStep={setTourStep}
+                    />
+                    <TripModal isOpen={isTripModalOpen} onClose={() => setTripModalOpen(false)} onTripAction={handleTripAction} tripToEdit={editingTrip} />
+                    <DataModal 
+                        isOpen={isDataModalOpen} 
+                        onClose={() => setIsDataModalOpen(false)} 
+                        currentData={trips} 
+                        onImport={handleImportData}
+                    />
+                    <AnalyticsModal 
+                        isOpen={isAnalyticsOpen}
+                        onClose={() => setIsAnalyticsOpen(false)}
+                        trips={trips}
+                        theme={theme}
+                    />
+                    <ConfirmationModal
+                        isOpen={!!confirmAction}
+                        onClose={handleModalClose}
+                        onConfirm={handleConfirm}
+                        title={modalTitle}
+                        confirmButtonText={modalConfirmText}
+                        cancelButtonText={modalCancelText}
+                        isDestructive={isDestructive}
+                    >
+                        {modalBody}
+                    </ConfirmationModal>
+                </div>
+            );
+        }
 
             return (
                 <div className="min-h-screen font-sans">
@@ -1402,7 +1587,7 @@
                                             filteredExpenses.map((expense, index) => {
                                                 const isSettlement = expense.isSettlement;
                                                 return (
-                                            <div key={expense.id} className={`bg-slate-900/40 p-4 rounded-lg flex items-start justify-between interactive-item animate-fadeInUp ${isSettlement ? 'border border-emerald-500/30' : ''}`} style={{animationDelay: `${index * 0.1}s`, opacity: 0}}>
+                                            <div key={expense.id} onClick={() => setDetailExpenseId(expense.id)} className={`cursor-pointer bg-slate-900/40 p-4 rounded-lg flex items-start justify-between interactive-item animate-fadeInUp ${isSettlement ? 'border border-emerald-500/30' : ''}`} style={{animationDelay: `${index * 0.1}s`, opacity: 0}} title="Click to view breakdown">
                                                 <div>
                                                     <div className="flex items-center gap-2">
                                                         <span 
@@ -1428,11 +1613,11 @@
                                                     <p className="text-xl font-bold text-emerald-400">₹{parseFloat(expense.amount).toFixed(2)}</p>
                                                      <div className="flex items-center justify-end gap-2 mt-1">
                                                         {!isSettlement && (
-                                                            <button onClick={() => handleOpenEditExpenseModal(expense.id)} className="text-slate-400 hover:text-cyan-400 p-1 rounded-full hover:bg-cyan-500/20 transition-all active:scale-90">
+                                                            <button onClick={(e) => { e.stopPropagation(); handleOpenEditExpenseModal(expense.id); }} className="text-slate-400 hover:text-cyan-400 p-1 rounded-full hover:bg-cyan-500/20 transition-all active:scale-90">
                                                                 <EditIcon />
                                                             </button>
                                                         )}
-                                                        <button onClick={() => { setActionTargetId(expense.id); setConfirmAction('removeExpense'); }} className="text-slate-400 hover:text-rose-400 p-1 rounded-full hover:bg-rose-500/20 transition-all active:scale-90">
+                                                        <button onClick={(e) => { e.stopPropagation(); setActionTargetId(expense.id); setConfirmAction('removeExpense'); }} className="text-slate-400 hover:text-rose-400 p-1 rounded-full hover:bg-rose-500/20 transition-all active:scale-90">
                                                             <TrashIcon />
                                                         </button>
                                                      </div>
@@ -1539,6 +1724,13 @@
                     onUpdateExpense={updateExpense}
                     guests={activeTrip.guests}
                     expenseToEdit={activeTrip.expenses.find(exp => exp.id === editingExpenseId)}
+                />
+                <ExpenseDetailModal
+                    isOpen={!!detailExpenseId}
+                    onClose={() => setDetailExpenseId(null)}
+                    expense={activeTrip?.expenses.find(e => e.id === detailExpenseId)}
+                    guestMap={guestMap}
+                    theme={theme}
                 />
                 <DataModal 
                     isOpen={isDataModalOpen} 
@@ -3671,6 +3863,110 @@
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            );
+        }
+
+        function ExpenseDetailModal({ isOpen, onClose, expense, guestMap, theme }) {
+            const [isAnimating, setIsAnimating] = useState(false);
+
+            useEffect(() => {
+                if (isOpen) {
+                    requestAnimationFrame(() => setIsAnimating(true));
+                } else {
+                    setIsAnimating(false);
+                }
+            }, [isOpen]);
+
+            const handleClose = () => {
+                setIsAnimating(false);
+                setTimeout(onClose, 300);
+            };
+
+            if (!isOpen && !isAnimating) return null;
+            if (!expense) return null;
+
+            const totalAmount = parseFloat(expense.amount);
+            
+            const shares = (expense.splitWith || []).map(guestId => {
+                let shareAmt = 0;
+                if (expense.splitType === 'equally') {
+                    shareAmt = totalAmount / expense.splitWith.length;
+                } else if (expense.splitType === 'amounts') {
+                    shareAmt = parseFloat(expense.splitDetails?.[guestId] || 0);
+                } else if (expense.splitType === 'percentages') {
+                    shareAmt = totalAmount * (parseFloat(expense.splitDetails?.[guestId] || 0) / 100);
+                }
+                const percentage = totalAmount > 0 ? (shareAmt / totalAmount) * 100 : 0;
+                return { guestId, name: guestMap[guestId] || 'Unknown', amount: shareAmt, percentage };
+            }).sort((a, b) => b.amount - a.amount);
+
+            const isDark = theme === 'dark';
+
+            return (
+                <div 
+                    className={`fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black transition-opacity duration-300 ${isAnimating ? 'bg-opacity-70' : 'bg-opacity-0'}`}
+                    onClick={handleClose}
+                >
+                    <div 
+                        className={`glass-modal rounded-xl shadow-2xl w-full max-w-md p-6 transform transition-all duration-400 cubic-bezier(0.34, 1.56, 0.64, 1) ${isAnimating ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`}
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <div className="flex justify-between items-start mb-6">
+                            <h2 className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>Expense Breakdown</h2>
+                            <button onClick={handleClose} className={`transition-colors p-1 rounded-full ${isDark ? 'text-slate-400 hover:text-white hover:bg-white/10' : 'text-slate-500 hover:text-slate-800 hover:bg-black/5'}`}>
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+                        
+                        {/* Tree Root */}
+                        <div className={`relative z-10 rounded-xl p-4 mb-2 border ${isDark ? 'bg-slate-800/80 border-slate-700/80 shadow-lg' : 'bg-white border-slate-200 shadow-md'}`}>
+                            <div className="flex items-center gap-3">
+                                <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${isDark ? 'bg-cyan-500/20 text-cyan-400' : 'bg-cyan-100 text-cyan-600'}`}>
+                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <p className={`text-lg font-bold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{expense.description}</p>
+                                    <p className={`text-sm truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                                        Paid by <span className={`font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{guestMap[expense.paidById]}</span>
+                                    </p>
+                                </div>
+                                <div className="text-right shrink-0 ml-2">
+                                    <p className={`text-xl font-bold ${isDark ? 'text-cyan-400' : 'text-cyan-600'}`}>₹{totalAmount.toFixed(2)}</p>
+                                    <p className={`text-xs uppercase font-semibold mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{expense.category}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Tree Branches */}
+                        <div className="relative pl-6 pt-2">
+                            {/* Main vertical trunk */}
+                            <div className={`absolute top-0 bottom-6 left-6 w-0.5 rounded-full ${isDark ? 'bg-slate-700' : 'bg-slate-300'}`}></div>
+                            
+                            <div className="space-y-3 relative z-10 max-h-64 overflow-y-auto pr-2 hide-scrollbar">
+                                {shares.map((share, index) => (
+                                    <div key={share.guestId} className="relative flex items-center pl-8 animate-fadeInUp" style={{animationDelay: `${index * 0.1}s`}}>
+                                        {/* Horizontal branch */}
+                                        <div className={`absolute left-0 top-1/2 w-8 h-0.5 rounded-full ${isDark ? 'bg-slate-700' : 'bg-slate-300'}`}></div>
+                                        
+                                        {/* Leaf node */}
+                                        <div className={`flex-1 p-3 rounded-lg border flex items-center justify-between transition-transform hover:-translate-y-0.5 shadow-sm ${isDark ? 'bg-slate-900/60 border-slate-700/50 hover:border-slate-600' : 'bg-slate-50 border-slate-200 hover:border-slate-300'}`}>
+                                            <div className="flex items-center gap-2.5 min-w-0">
+                                                <Avatar name={share.name} size="sm" />
+                                                <span className={`font-bold truncate text-sm sm:text-base ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{share.name}</span>
+                                            </div>
+                                            <div className="text-right shrink-0 ml-2">
+                                                <p className={`font-bold ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>₹{share.amount.toFixed(2)}</p>
+                                                <p className={`text-xs font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{share.percentage.toFixed(1)}%</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
                     </div>
                 </div>
             );
