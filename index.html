@@ -74,9 +74,10 @@
         
         /* Carbon Texture for Dashboard & Graphs (Dark Mode) */
         .carbon-card {
-            background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.9) 100%),
-                        repeating-linear-gradient(45deg, rgba(0,0,0,0.15) 0px, rgba(0,0,0,0.15) 2px, transparent 2px, transparent 4px) !important;
-            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.85) 0%, rgba(15, 23, 42, 0.95) 100%),
+                        repeating-linear-gradient(45deg, rgba(0,0,0,0.85) 0px, rgba(0,0,0,0.85) 2px, transparent 2px, transparent 4px),
+                        repeating-linear-gradient(-45deg, rgba(255,255,255,0.15) 0px, rgba(255,255,255,0.15) 2px, transparent 2px, transparent 4px) !important;
+            border: 1px solid rgba(255, 255, 255, 0.15) !important;
             box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05), 0 8px 32px 0 rgba(0, 0, 0, 0.5) !important;
             position: relative;
             overflow: hidden;
@@ -85,7 +86,7 @@
             content: '';
             position: absolute;
             top: 0; left: 0; right: 0; bottom: 0;
-            background: radial-gradient(circle at top right, rgba(56, 189, 248, 0.1), transparent 50%);
+            background: radial-gradient(circle at top right, rgba(56, 189, 248, 0.15), transparent 50%);
             pointer-events: none;
         }
 
@@ -94,9 +95,9 @@
             background-color: #0f172a !important; 
             background-image: 
                 linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.95) 100%),
-                repeating-linear-gradient(45deg, rgba(0,0,0,0.25) 0, rgba(0,0,0,0.25) 2px, transparent 2px, transparent 4px),
-                repeating-linear-gradient(-45deg, rgba(255,255,255,0.03) 0, rgba(255,255,255,0.03) 2px, transparent 2px, transparent 4px) !important;
-            border: 1px solid rgba(255, 255, 255, 0.12) !important;
+                repeating-linear-gradient(45deg, rgba(0,0,0,0.85) 0, rgba(0,0,0,0.85) 2px, transparent 2px, transparent 4px),
+                repeating-linear-gradient(-45deg, rgba(255,255,255,0.15) 0, rgba(255,255,255,0.15) 2px, transparent 2px, transparent 4px) !important;
+            border: 1px solid rgba(255, 255, 255, 0.15) !important;
             box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05), 0 8px 24px rgba(0, 0, 0, 0.6) !important;
         }
 
@@ -155,21 +156,22 @@
 
         /* Textured Dashboards in Light Mode (Subtle Paper/Noise) */
         .light .carbon-card {
-            background: linear-gradient(135deg, rgba(255, 253, 249, 0.95), rgba(250, 246, 238, 0.9)), 
-                        url('data:image/svg+xml;utf8,<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><filter id="noiseFilter"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23noiseFilter)" opacity="0.04"/></svg>') !important;
-            border: 1px solid rgba(212, 196, 175, 0.6) !important;
+            background: linear-gradient(135deg, rgba(255, 253, 249, 0.9), rgba(245, 240, 230, 0.95)), 
+                        repeating-linear-gradient(45deg, rgba(139, 107, 74, 0.35) 0px, rgba(139, 107, 74, 0.35) 2px, transparent 2px, transparent 4px),
+                        repeating-linear-gradient(-45deg, rgba(255, 255, 255, 1) 0px, rgba(255, 255, 255, 1) 2px, transparent 2px, transparent 4px) !important;
+            border: 1px solid rgba(212, 196, 175, 0.8) !important;
             box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.9), 0 8px 25px rgba(139, 107, 74, 0.08) !important;
         }
         .light .carbon-card::before {
-            background: radial-gradient(circle at top right, rgba(250, 204, 21, 0.05), transparent 50%);
+            background: radial-gradient(circle at top right, rgba(250, 204, 21, 0.1), transparent 50%);
         }
         
         .light .trip-card-texture {
             background-color: #fdfbf7 !important; 
             background-image: 
                 linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(245, 240, 230, 0.95) 100%),
-                repeating-linear-gradient(45deg, rgba(139, 107, 74, 0.05) 0, rgba(139, 107, 74, 0.05) 2px, transparent 2px, transparent 4px),
-                repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.6) 0, rgba(255, 255, 255, 0.6) 2px, transparent 2px, transparent 4px) !important;
+                repeating-linear-gradient(45deg, rgba(139, 107, 74, 0.35) 0, rgba(139, 107, 74, 0.35) 2px, transparent 2px, transparent 4px),
+                repeating-linear-gradient(-45deg, rgba(255, 255, 255, 1) 0, rgba(255, 255, 255, 1) 2px, transparent 2px, transparent 4px) !important;
             border: 1px solid rgba(212, 196, 175, 0.8) !important;
             box-shadow: inset 0 1px 3px rgba(255, 255, 255, 1), 0 8px 24px rgba(139, 107, 74, 0.1) !important;
         }
@@ -350,6 +352,10 @@
                 else if (balance > 0.01) creditors.push({ id: guestId, amount: balance });
             });
             
+            // Optimization sorting (Largest debtors pay largest creditors first) to match visualizer and minimize transactions
+            debtors.sort((a, b) => b.amount - a.amount);
+            creditors.sort((a, b) => b.amount - a.amount);
+
             const transactions = [];
             let debtorIndex = 0, creditorIndex = 0;
             while (debtorIndex < debtors.length && creditorIndex < creditors.length) {
@@ -1222,7 +1228,7 @@
                                             return (
                                                 <div 
                                                     key={trip.id} 
-                                                    className={`glass-card trip-card-texture rounded-2xl overflow-hidden interactive-item flex flex-col cursor-pointer relative h-fit ${isExpanded ? 'ring-2 ring-cyan-500/50 shadow-cyan-500/20' : ''}`} 
+                                                    className={`glass-card carbon-card rounded-2xl overflow-hidden interactive-item flex flex-col cursor-pointer relative h-fit ${isExpanded ? 'ring-2 ring-cyan-500/50 shadow-cyan-500/20' : ''}`} 
                                                     style={{animation: `fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) ${index * 0.1}s forwards`, opacity: 0}} 
                                                     onClick={() => setExpandedTripId(prev => prev === trip.id ? null : trip.id)} 
                                                     title={isExpanded ? "Click to collapse" : "Click to view Settlement Plan"}
@@ -1245,14 +1251,14 @@
                                                             
                                                             <div className="flex items-center justify-between mb-6">
                                                                 {trip.guests.length > 0 ? (
-                                                                    <div className="flex -space-x-2.5 overflow-hidden p-1 -ml-1">
-                                                                        {displayedGuests.map(g => (
-                                                                            <div key={g.id} className="inline-block rounded-full avatar-ring shadow-sm z-10">
-                                                                                <Avatar name={g.name} size="sm" />
+                                                                    <div className="flex -space-x-2.5 p-1 -ml-1">
+                                                                        {displayedGuests.map((g, i) => (
+                                                                            <div key={g.id} className="relative inline-block rounded-full avatar-ring shadow-sm transition-transform hover:scale-110 hover:z-20" style={{ zIndex: 10 - i }}>
+                                                                                <Avatar name={g.name} />
                                                                             </div>
                                                                         ))}
                                                                         {extraGuests > 0 && (
-                                                                            <div className={`inline-flex items-center justify-center w-6 h-6 sm:w-8 sm:h-8 rounded-full avatar-ring text-[10px] sm:text-xs font-bold z-10 shadow-sm ${isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-200 text-slate-700'}`}>
+                                                                            <div className={`relative inline-flex items-center justify-center w-8 h-8 rounded-full avatar-ring text-xs font-bold shadow-sm transition-transform hover:scale-110 hover:z-20 ${isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-200 text-slate-700'}`} style={{ zIndex: 0 }}>
                                                                                 +{extraGuests}
                                                                             </div>
                                                                         )}
@@ -1686,6 +1692,11 @@
                                 {activeTrip.expenses && activeTrip.expenses.length > 0 && (
                                 <div className="animate-fadeInUp" style={{animationDelay: '0.6s', opacity: 0}}>
                                     <SpendingChart expenses={activeTrip.expenses} guests={activeTrip.guests} theme={theme} />
+                                </div>
+                            )}
+                            {activeTrip.expenses && activeTrip.expenses.length > 0 && (
+                                <div className="animate-fadeInUp" style={{animationDelay: '0.7s', opacity: 0}}>
+                                    <SettlementAlgorithmStepper trip={activeTrip} guestMap={guestMap} theme={theme} />
                                 </div>
                             )}
                         </div>
@@ -3966,6 +3977,151 @@
                                     </div>
                                 ))}
                             </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function SettlementAlgorithmStepper({ trip, guestMap, theme }) {
+            const { initialBalances, steps, hasDebts } = useMemo(() => {
+                if (!trip || !trip.guests || trip.expenses.length === 0) return { initialBalances: [], steps: [], hasDebts: false };
+                
+                // 1. Calculate raw balances (who paid what minus what they owed)
+                const balances = trip.guests.reduce((acc, guest) => ({ ...acc, [guest.id]: 0 }), {});
+                trip.expenses.forEach(expense => {
+                    const totalAmount = parseFloat(expense.amount);
+                    if (balances[expense.paidById] !== undefined) balances[expense.paidById] += totalAmount;
+
+                    switch (expense.splitType) {
+                        case 'amounts':
+                            Object.entries(expense.splitDetails || {}).forEach(([guestId, amount]) => {
+                                if (balances[guestId] !== undefined) balances[guestId] -= parseFloat(amount);
+                            });
+                            break;
+                        case 'percentages':
+                            Object.entries(expense.splitDetails || {}).forEach(([guestId, percentage]) => {
+                                if (balances[guestId] !== undefined) balances[guestId] -= totalAmount * (parseFloat(percentage) / 100);
+                            });
+                            break;
+                        default: // equally
+                            if (expense.splitWith.length > 0) {
+                                const share = totalAmount / expense.splitWith.length;
+                                expense.splitWith.forEach(guestId => {
+                                    if (balances[guestId] !== undefined) balances[guestId] -= share;
+                                });
+                            }
+                            break;
+                    }
+                });
+
+                const rawBalances = Object.entries(balances)
+                    .map(([id, bal]) => ({ id, bal }))
+                    .filter(b => Math.abs(b.bal) > 0.01)
+                    .sort((a, b) => b.bal - a.bal); // Sort richest to poorest
+
+                // 2. Fetch the exact settlement steps from the global calculateSettlement function to ensure 100% match
+                const globalSettlement = calculateSettlement(trip);
+
+                return { initialBalances: rawBalances, steps: globalSettlement.transactions, hasDebts: rawBalances.length > 0 };
+            }, [trip]);
+
+            if (!hasDebts && trip.expenses.length === 0) return null;
+            const isDark = theme === 'dark';
+
+            return (
+                <div className="glass-card carbon-card p-5 sm:p-6 rounded-2xl relative overflow-hidden">
+                    {/* Background decoration */}
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/5 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
+                    
+                    <h2 className={`text-2xl font-bold flex items-center gap-2 mb-6 relative z-10 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+                        </svg>
+                        How the Math Works
+                    </h2>
+                    
+                    {/* Step 1: Net Balances */}
+                    <div className="mb-8 relative z-10">
+                        <div className="flex items-center gap-2 mb-2">
+                            <span className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${isDark ? 'bg-cyan-500/20 text-cyan-400' : 'bg-cyan-100 text-cyan-700'}`}>1</span>
+                            <h3 className={`font-bold text-lg ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>Calculate Net Balances</h3>
+                        </div>
+                        <p className={`text-sm mb-4 pl-8 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>We sum up everything everyone paid, and subtract their fair share of the expenses to find out exactly who is owed, and who owes.</p>
+                        
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 pl-8">
+                            {initialBalances.length > 0 ? initialBalances.map(b => (
+                                <div key={b.id} className={`p-3 rounded-xl border flex flex-col items-center justify-center text-center transition-transform hover:-translate-y-1 ${isDark ? 'bg-slate-800/60 border-slate-700/50 hover:bg-slate-800' : 'bg-white border-slate-200 hover:shadow-md'}`}>
+                                    <Avatar name={guestMap[b.id]} size="md" />
+                                    <span className={`font-semibold mt-2 text-sm truncate w-full ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{guestMap[b.id]}</span>
+                                    <span className={`font-bold text-sm ${b.bal > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                        {b.bal > 0 ? '+' : ''}₹{b.bal.toFixed(2)}
+                                    </span>
+                                    <span className={`text-[10px] uppercase font-bold mt-1 ${b.bal > 0 ? 'text-emerald-500/70' : 'text-rose-500/70'}`}>
+                                        {b.bal > 0 ? 'Is Owed' : 'In Debt'}
+                                    </span>
+                                </div>
+                            )) : (
+                                <div className={`col-span-full p-4 rounded-xl text-center text-sm font-semibold border ${isDark ? 'bg-slate-800/50 border-slate-700/50 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-500'}`}>
+                                    No net balances to calculate yet.
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Step 2: Optimizing Payments */}
+                    <div className="relative z-10">
+                        <div className="flex items-center gap-2 mb-2">
+                            <span className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${isDark ? 'bg-indigo-500/20 text-indigo-400' : 'bg-indigo-100 text-indigo-700'}`}>2</span>
+                            <h3 className={`font-bold text-lg ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>Optimize Payments</h3>
+                        </div>
+                        <p className={`text-sm mb-4 pl-8 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Instead of everyone paying everyone else back individually, the algorithm minimizes the total number of transactions required.</p>
+                        
+                        <div className="space-y-3 pl-8">
+                            {steps.length > 0 ? steps.map((step, idx) => (
+                                <div key={idx} className={`p-4 rounded-xl border flex items-center justify-between gap-2 shadow-sm transition-all hover:-translate-y-0.5 ${isDark ? 'bg-slate-900/60 border-slate-700/50 hover:border-slate-600' : 'bg-slate-50 border-slate-200 hover:bg-white hover:shadow-md'}`}>
+                                    
+                                    {/* Debtor */}
+                                    <div className="flex flex-col items-center flex-1 min-w-[80px]">
+                                        <div className="relative">
+                                            <Avatar name={guestMap[step.from]} size="md" />
+                                            <div className="absolute -bottom-1 -right-1 bg-rose-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center border border-slate-900">-</div>
+                                        </div>
+                                        <span className={`text-xs sm:text-sm font-bold mt-2 truncate max-w-full px-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{guestMap[step.from]}</span>
+                                    </div>
+                                    
+                                    {/* Arrow & Amount */}
+                                    <div className="flex flex-col items-center justify-center flex-[2] px-2">
+                                        <span className={`font-black text-lg sm:text-xl mb-1 whitespace-nowrap bg-clip-text text-transparent bg-gradient-to-r ${isDark ? 'from-cyan-400 to-blue-500' : 'from-cyan-600 to-blue-700'}`}>
+                                            ₹{step.amount.toFixed(2)}
+                                        </span>
+                                        <div className="w-full relative flex items-center justify-center">
+                                            {/* Line */}
+                                            <div className={`h-1 w-full rounded-full ${isDark ? 'bg-cyan-500/30' : 'bg-cyan-500/20'}`}></div>
+                                            {/* Moving Arrow Effect */}
+                                            <div className="absolute w-full flex justify-center overflow-hidden">
+                                                <svg className="w-24 h-5 text-cyan-500 animate-[pulse_2s_cubic-bezier(0.4,0,0.6,1)_infinite]" preserveAspectRatio="none" viewBox="0 0 100 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                    <path d="M0 5H95M95 5L85 0M95 5L85 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                                </svg>
+                                            </div>
+                                        </div>
+                                        <span className={`text-[10px] font-semibold uppercase tracking-wider mt-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Pays To</span>
+                                    </div>
+
+                                    {/* Creditor */}
+                                    <div className="flex flex-col items-center flex-1 min-w-[80px]">
+                                        <div className="relative">
+                                            <Avatar name={guestMap[step.to]} size="md" />
+                                            <div className="absolute -bottom-1 -right-1 bg-emerald-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center border border-slate-900">+</div>
+                                        </div>
+                                        <span className={`text-xs sm:text-sm font-bold mt-2 truncate max-w-full px-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{guestMap[step.to]}</span>
+                                    </div>
+                                </div>
+                            )) : (
+                                <div className={`py-4 rounded-xl text-center text-sm font-semibold border ${isDark ? 'bg-slate-800/50 border-emerald-500/20 text-emerald-400' : 'bg-emerald-50 border-emerald-200 text-emerald-600'}`}>
+                                    🎉 Everyone is fully settled up! No transactions needed.
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
