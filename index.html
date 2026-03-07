@@ -312,7 +312,11 @@
 
             expenses.forEach(expense => {
                 const totalAmount = parseFloat(expense.amount);
-                if (balances[expense.paidById] !== undefined) {
+                if (expense.paidBy) {
+                    Object.entries(expense.paidBy).forEach(([guestId, amount]) => {
+                        if (balances[guestId] !== undefined) balances[guestId] += parseFloat(amount);
+                    });
+                } else if (balances[expense.paidById] !== undefined) {
                     balances[expense.paidById] += totalAmount;
                 }
 
@@ -384,7 +388,14 @@
             trip.expenses.forEach(expense => {
                 if (expense.isSettlement) return; // Ignore settlements for initial debt
                 const totalAmount = parseFloat(expense.amount);
-                if (balances[expense.paidById] !== undefined) balances[expense.paidById] += totalAmount;
+                
+                if (expense.paidBy) {
+                    Object.entries(expense.paidBy).forEach(([guestId, amount]) => {
+                        if (balances[guestId] !== undefined) balances[guestId] += parseFloat(amount);
+                    });
+                } else if (balances[expense.paidById] !== undefined) {
+                    balances[expense.paidById] += totalAmount;
+                }
 
                 if (expense.splitType === 'amounts') {
                     Object.entries(expense.splitDetails || {}).forEach(([guestId, amount]) => {
@@ -859,7 +870,7 @@
 
                 const updater = trip => {
                     const updatedExpenses = trip.expenses
-                        .filter(exp => exp.paidById !== id)
+                        .filter(exp => exp.paidById !== id && !(exp.paidBy && exp.paidBy[id]))
                         .map(exp => ({ ...exp, splitWith: exp.splitWith.filter(guestId => guestId !== id) }))
                         .filter(exp => exp.splitWith.length > 0);
                     return { ...trip, guests: trip.guests.filter(g => g.id !== id), expenses: updatedExpenses, paidSettlements: {} };
@@ -868,8 +879,8 @@
             };
 
             const addExpense = (expense) => {
-                const payerName = activeTrip?.guests.find(g => g.id === expense.paidById)?.name || 'Someone';
-                const message = `${payerName} added "${expense.description}" (₹${expense.amount.toFixed(2)}).`;
+                const payerNames = expense.paidBy ? Object.keys(expense.paidBy).map(id => activeTrip?.guests.find(g => g.id === id)?.name).join(', ') : activeTrip?.guests.find(g => g.id === expense.paidById)?.name || 'Someone';
+                const message = `${payerNames} added "${expense.description}" (₹${expense.amount.toFixed(2)}).`;
                 modifyActiveTrip(trip => ({ ...trip, expenses: [...trip.expenses, { ...expense, id: generateId() }], paidSettlements: {} }), message);
             };
             
@@ -1007,7 +1018,7 @@
                 if (!activeTrip) return [];
                 let filtered = activeTrip.expenses;
                 if (filterPaidBy !== 'All') {
-                    filtered = filtered.filter(exp => exp.paidById === filterPaidBy);
+                    filtered = filtered.filter(exp => exp.paidById === filterPaidBy || (exp.paidBy && exp.paidBy[filterPaidBy]));
                 }
                 if (expenseSearchQuery.trim()) {
                     const query = expenseSearchQuery.toLowerCase();
@@ -1037,7 +1048,11 @@
                     const totalAmount = parseFloat(expense.amount);
                     if (isNaN(totalAmount) || totalAmount <= 0) return;
             
-                    if (summaries[expense.paidById]) {
+                    if (expense.paidBy) {
+                        Object.entries(expense.paidBy).forEach(([guestId, amt]) => {
+                            if (summaries[guestId]) summaries[guestId].paid += parseFloat(amt);
+                        });
+                    } else if (summaries[expense.paidById]) {
                         summaries[expense.paidById].paid += totalAmount;
                     }
             
@@ -1605,7 +1620,9 @@
                                                     {!isSettlement ? (
                                                         <>
                                                             <p className="text-sm text-slate-300 pl-5">
-                                                                Paid by <span className="font-semibold text-slate-200">{guestMap[expense.paidById]}</span> on {new Date(expense.date).toLocaleDateString()}
+                                                                Paid by <span className="font-semibold text-slate-200">
+                                                                    {expense.paidBy ? Object.keys(expense.paidBy).map(id => guestMap[id]).join(', ') : guestMap[expense.paidById]}
+                                                                </span> on {new Date(expense.date).toLocaleDateString()}
                                                             </p>
                                                             <p className="text-sm text-slate-400 mt-1 pl-5">
                                                                 {expense.splitType === 'equally' ? `Split equally with: ${expense.splitWith.map(id => guestMap[id]).join(', ')}` : `Split unequally`}
@@ -1692,11 +1709,6 @@
                                 {activeTrip.expenses && activeTrip.expenses.length > 0 && (
                                 <div className="animate-fadeInUp" style={{animationDelay: '0.6s', opacity: 0}}>
                                     <SpendingChart expenses={activeTrip.expenses} guests={activeTrip.guests} theme={theme} />
-                                </div>
-                            )}
-                            {activeTrip.expenses && activeTrip.expenses.length > 0 && (
-                                <div className="animate-fadeInUp" style={{animationDelay: '0.7s', opacity: 0}}>
-                                    <SettlementAlgorithmStepper trip={activeTrip} guestMap={guestMap} theme={theme} />
                                 </div>
                             )}
                         </div>
@@ -1913,7 +1925,10 @@
 
                         const valuesByPerson = {};
                         const totalAmount = parseFloat(exp.amount);
-                        const payerName = tripGuestMap[exp.paidById] || 'Unknown';
+                        
+                        const payers = exp.paidBy 
+                            ? Object.entries(exp.paidBy).map(([id, amt]) => ({ name: tripGuestMap[id] || 'Unknown', amt: parseFloat(amt) }))
+                            : [{ name: tripGuestMap[exp.paidById] || 'Unknown', amt: totalAmount }];
 
                         const tempShares = {};
                         if (exp.splitType === 'equally') {
@@ -1935,13 +1950,17 @@
                         }
 
                         if (metric === 'paid') {
-                            valuesByPerson[payerName] = (valuesByPerson[payerName] || 0) + totalAmount;
+                            payers.forEach(p => {
+                                valuesByPerson[p.name] = (valuesByPerson[p.name] || 0) + p.amt;
+                            });
                         } else if (metric === 'share') {
                             Object.entries(tempShares).forEach(([name, amt]) => {
                                 valuesByPerson[name] = (valuesByPerson[name] || 0) + amt;
                             });
                         } else if (metric === 'net') {
-                            valuesByPerson[payerName] = (valuesByPerson[payerName] || 0) + totalAmount;
+                            payers.forEach(p => {
+                                valuesByPerson[p.name] = (valuesByPerson[p.name] || 0) + p.amt;
+                            });
                             Object.entries(tempShares).forEach(([name, amt]) => {
                                 valuesByPerson[name] = (valuesByPerson[name] || 0) - amt;
                             });
@@ -2002,8 +2021,13 @@
                         const cat = exp.category || 'Other';
                         catTotals[cat] = (catTotals[cat] || 0) + amt;
                         
-                        const payer = tripMap[exp.paidById] || 'Unknown';
-                        payerTotals[payer] = (payerTotals[payer] || 0) + amt;
+                        const payers = exp.paidBy 
+                            ? Object.entries(exp.paidBy).map(([id, amount]) => ({ name: tripMap[id] || 'Unknown', amount: parseFloat(amount) }))
+                            : [{ name: tripMap[exp.paidById] || 'Unknown', amount: amt }];
+                        
+                        payers.forEach(p => {
+                            payerTotals[p.name] = (payerTotals[p.name] || 0) + p.amount;
+                        });
                         
                         const dateObj = new Date(exp.date);
                         let periodKey;
@@ -3650,7 +3674,9 @@
             const [description, setDescription] = useState('');
             const [amount, setAmount] = useState('');
             const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+            const [payerMode, setPayerMode] = useState('single');
             const [paidById, setPaidById] = useState('');
+            const [paidByMultiple, setPaidByMultiple] = useState({});
             const [splitWith, setSplitWith] = useState([]);
             const [category, setCategory] = useState(CATEGORIES[0]);
             const [splitType, setSplitType] = useState('equally');
@@ -3665,7 +3691,17 @@
                         setDescription(expenseToEdit.description);
                         setAmount(expenseToEdit.amount.toString());
                         setDate(expenseToEdit.date);
-                        setPaidById(expenseToEdit.paidById);
+                        
+                        if (expenseToEdit.paidBy) {
+                            setPayerMode('multiple');
+                            setPaidByMultiple(expenseToEdit.paidBy || {});
+                            setPaidById(Object.keys(expenseToEdit.paidBy)[0] || '');
+                        } else {
+                            setPayerMode('single');
+                            setPaidById(expenseToEdit.paidById);
+                            setPaidByMultiple({ [expenseToEdit.paidById]: expenseToEdit.amount });
+                        }
+                        
                         setSplitWith(expenseToEdit.splitWith || []);
                         setCategory(expenseToEdit.category || CATEGORIES[0]);
                         setSplitType(expenseToEdit.splitType || 'equally');
@@ -3679,7 +3715,9 @@
                         setDescription('');
                         setAmount('');
                         setDate(new Date().toISOString().split('T')[0]);
+                        setPayerMode('single');
                         setPaidById(firstGuestId);
+                        setPaidByMultiple({ [firstGuestId]: '' });
                         setSplitWith(guests.map(g => g.id));
                         setCategory(CATEGORIES[0]);
                         setSplitType('equally');
@@ -3733,7 +3771,28 @@
                 const numAmount = parseFloat(amount);
                 if (!description.trim()) { setError('Description is required.'); return; }
                 if (isNaN(numAmount) || numAmount <= 0) { setError('Please enter a valid positive amount.'); return; }
-                if (!paidById) { setError('Please select who paid.'); return; }
+                
+                let finalPaidBy = null;
+                let finalPaidById = null;
+                
+                if (payerMode === 'multiple') {
+                    const multipleTotal = Object.values(paidByMultiple).reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
+                    if (Math.abs(multipleTotal - numAmount) > 0.01) {
+                        setError(`The sum of amounts paid (₹${multipleTotal.toFixed(2)}) must equal the total expense (₹${numAmount.toFixed(2)}).`);
+                        return;
+                    }
+                    finalPaidBy = Object.entries(paidByMultiple).reduce((acc, [id, val]) => {
+                        if (parseFloat(val) > 0) acc[id] = val;
+                        return acc;
+                    }, {});
+                    if (Object.keys(finalPaidBy).length === 0) {
+                         setError('Please enter at least one payer amount.'); return;
+                    }
+                } else {
+                    if (!paidById) { setError('Please select who paid.'); return; }
+                    finalPaidById = paidById;
+                }
+
                 if (splitWith.length === 0) { setError('Please select at least one person to split with.'); return; }
 
                 if (splitType === 'amounts') {
@@ -3755,7 +3814,7 @@
                     return acc;
                 }, {});
 
-                const expenseData = { description: description.trim(), amount: numAmount, date, paidById, splitWith, category, splitType, splitDetails: finalSplitDetails };
+                const expenseData = { description: description.trim(), amount: numAmount, date, paidById: finalPaidById, paidBy: finalPaidBy, splitWith, category, splitType, splitDetails: finalSplitDetails };
                 if (expenseToEdit) {
                     onUpdateExpense(expenseToEdit.id, expenseData);
                 } else {
@@ -3798,11 +3857,57 @@
                                 <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full p-2 bg-slate-700/50 border border-slate-600 rounded-md text-white transition-all focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500" />
                             </div>
                             <div>
-                                <label className="block font-semibold mb-1 text-slate-300">Paid by</label>
-                                <select value={paidById} onChange={e => setPaidById(e.target.value)} className="w-full p-2 bg-slate-700/50 border border-slate-600 rounded-md text-white transition-all focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500">
-                                    <option value="" disabled>Select a person</option>
-                                    {guests.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-                                </select>
+                                <label className="block font-semibold mb-2 text-slate-300">Paid by</label>
+                                <div className="flex items-center gap-4 mb-3 bg-slate-700/50 rounded-lg p-1">
+                                    {['single', 'multiple'].map(mode => (
+                                        <button key={mode} type="button" onClick={() => setPayerMode(mode)} className={`flex-1 py-1 px-2 text-sm rounded-md capitalize transition-all active:scale-95 ${payerMode === mode ? 'bg-indigo-500 text-white shadow-md' : 'bg-transparent text-slate-300 hover:bg-slate-600'}`}>
+                                            {mode} Payer
+                                        </button>
+                                    ))}
+                                </div>
+                                {payerMode === 'single' ? (
+                                    <select value={paidById} onChange={e => setPaidById(e.target.value)} className="w-full p-2 bg-slate-700/50 border border-slate-600 rounded-md text-white transition-all focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500">
+                                        <option value="" disabled>Select a person</option>
+                                        {guests.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                                    </select>
+                                ) : (
+                                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                                        {guests.map(g => (
+                                            <div key={`payer-${g.id}`} className="flex items-center gap-2 p-2 rounded-md transition-all duration-300 bg-slate-700/30">
+                                                <Avatar name={g.name} size="sm" />
+                                                <label className="flex-1 text-slate-200">{g.name}</label>
+                                                <div className="relative">
+                                                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400">₹</span>
+                                                    <input 
+                                                        type="number" 
+                                                        value={paidByMultiple[g.id] || ''}
+                                                        onChange={(e) => setPaidByMultiple(prev => ({...prev, [g.id]: e.target.value}))}
+                                                        className="w-24 p-1 pl-5 border rounded-md bg-slate-800 border-slate-600 text-white transition-all focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
+                                                        placeholder="0.00"
+                                                        min="0"
+                                                        step="0.01"
+                                                    />
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {(() => {
+                                            const multiplePaidTotal = Object.values(paidByMultiple).reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
+                                            const multipleRemainder = (parseFloat(amount) || 0) - multiplePaidTotal;
+                                            return (
+                                                <div className="flex justify-end items-center mt-2 pr-2 gap-3">
+                                                    {Math.abs(multipleRemainder) > 0.01 && (
+                                                        <span className={`text-sm font-semibold ${multipleRemainder < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                                                            {multipleRemainder < 0 ? `₹${Math.abs(multipleRemainder).toFixed(2)} over total` : `₹${multipleRemainder.toFixed(2)} left to assign`}
+                                                        </span>
+                                                    )}
+                                                    <div className="text-sm font-bold text-slate-300">
+                                                        Total Paid: ₹{multiplePaidTotal.toFixed(2)}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })()}
+                                    </div>
+                                )}
                             </div>
                             <div>
                                 <label className="block font-semibold mb-2 text-slate-300">Split</label>
@@ -3941,9 +4046,22 @@
                                 </div>
                                 <div className="min-w-0 flex-1">
                                     <p className={`text-lg font-bold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{expense.description}</p>
-                                    <p className={`text-sm truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                                        Paid by <span className={`font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{guestMap[expense.paidById]}</span>
-                                    </p>
+                                    <div className={`text-sm mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                                        <p className="font-semibold mb-0.5">Paid by:</p>
+                                        <div className="flex flex-wrap gap-1">
+                                            {expense.paidBy ? (
+                                                Object.entries(expense.paidBy).map(([id, amt]) => (
+                                                    <span key={id} className={`px-2 py-0.5 rounded-md text-xs font-medium ${isDark ? 'bg-slate-700/50 text-slate-300' : 'bg-slate-100 text-slate-700'}`}>
+                                                        {guestMap[id]}: ₹{parseFloat(amt).toFixed(2)}
+                                                    </span>
+                                                ))
+                                            ) : (
+                                                <span className={`px-2 py-0.5 rounded-md text-xs font-medium ${isDark ? 'bg-slate-700/50 text-slate-300' : 'bg-slate-100 text-slate-700'}`}>
+                                                    {guestMap[expense.paidById]}: ₹{totalAmount.toFixed(2)}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
                                 </div>
                                 <div className="text-right shrink-0 ml-2">
                                     <p className={`text-xl font-bold ${isDark ? 'text-cyan-400' : 'text-cyan-600'}`}>₹{totalAmount.toFixed(2)}</p>
@@ -3977,151 +4095,6 @@
                                     </div>
                                 ))}
                             </div>
-                        </div>
-                    </div>
-                </div>
-            );
-        }
-
-        function SettlementAlgorithmStepper({ trip, guestMap, theme }) {
-            const { initialBalances, steps, hasDebts } = useMemo(() => {
-                if (!trip || !trip.guests || trip.expenses.length === 0) return { initialBalances: [], steps: [], hasDebts: false };
-                
-                // 1. Calculate raw balances (who paid what minus what they owed)
-                const balances = trip.guests.reduce((acc, guest) => ({ ...acc, [guest.id]: 0 }), {});
-                trip.expenses.forEach(expense => {
-                    const totalAmount = parseFloat(expense.amount);
-                    if (balances[expense.paidById] !== undefined) balances[expense.paidById] += totalAmount;
-
-                    switch (expense.splitType) {
-                        case 'amounts':
-                            Object.entries(expense.splitDetails || {}).forEach(([guestId, amount]) => {
-                                if (balances[guestId] !== undefined) balances[guestId] -= parseFloat(amount);
-                            });
-                            break;
-                        case 'percentages':
-                            Object.entries(expense.splitDetails || {}).forEach(([guestId, percentage]) => {
-                                if (balances[guestId] !== undefined) balances[guestId] -= totalAmount * (parseFloat(percentage) / 100);
-                            });
-                            break;
-                        default: // equally
-                            if (expense.splitWith.length > 0) {
-                                const share = totalAmount / expense.splitWith.length;
-                                expense.splitWith.forEach(guestId => {
-                                    if (balances[guestId] !== undefined) balances[guestId] -= share;
-                                });
-                            }
-                            break;
-                    }
-                });
-
-                const rawBalances = Object.entries(balances)
-                    .map(([id, bal]) => ({ id, bal }))
-                    .filter(b => Math.abs(b.bal) > 0.01)
-                    .sort((a, b) => b.bal - a.bal); // Sort richest to poorest
-
-                // 2. Fetch the exact settlement steps from the global calculateSettlement function to ensure 100% match
-                const globalSettlement = calculateSettlement(trip);
-
-                return { initialBalances: rawBalances, steps: globalSettlement.transactions, hasDebts: rawBalances.length > 0 };
-            }, [trip]);
-
-            if (!hasDebts && trip.expenses.length === 0) return null;
-            const isDark = theme === 'dark';
-
-            return (
-                <div className="glass-card carbon-card p-5 sm:p-6 rounded-2xl relative overflow-hidden">
-                    {/* Background decoration */}
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/5 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
-                    
-                    <h2 className={`text-2xl font-bold flex items-center gap-2 mb-6 relative z-10 ${isDark ? 'text-white' : 'text-slate-800'}`}>
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
-                        </svg>
-                        How the Math Works
-                    </h2>
-                    
-                    {/* Step 1: Net Balances */}
-                    <div className="mb-8 relative z-10">
-                        <div className="flex items-center gap-2 mb-2">
-                            <span className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${isDark ? 'bg-cyan-500/20 text-cyan-400' : 'bg-cyan-100 text-cyan-700'}`}>1</span>
-                            <h3 className={`font-bold text-lg ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>Calculate Net Balances</h3>
-                        </div>
-                        <p className={`text-sm mb-4 pl-8 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>We sum up everything everyone paid, and subtract their fair share of the expenses to find out exactly who is owed, and who owes.</p>
-                        
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 pl-8">
-                            {initialBalances.length > 0 ? initialBalances.map(b => (
-                                <div key={b.id} className={`p-3 rounded-xl border flex flex-col items-center justify-center text-center transition-transform hover:-translate-y-1 ${isDark ? 'bg-slate-800/60 border-slate-700/50 hover:bg-slate-800' : 'bg-white border-slate-200 hover:shadow-md'}`}>
-                                    <Avatar name={guestMap[b.id]} size="md" />
-                                    <span className={`font-semibold mt-2 text-sm truncate w-full ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{guestMap[b.id]}</span>
-                                    <span className={`font-bold text-sm ${b.bal > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                                        {b.bal > 0 ? '+' : ''}₹{b.bal.toFixed(2)}
-                                    </span>
-                                    <span className={`text-[10px] uppercase font-bold mt-1 ${b.bal > 0 ? 'text-emerald-500/70' : 'text-rose-500/70'}`}>
-                                        {b.bal > 0 ? 'Is Owed' : 'In Debt'}
-                                    </span>
-                                </div>
-                            )) : (
-                                <div className={`col-span-full p-4 rounded-xl text-center text-sm font-semibold border ${isDark ? 'bg-slate-800/50 border-slate-700/50 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-500'}`}>
-                                    No net balances to calculate yet.
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Step 2: Optimizing Payments */}
-                    <div className="relative z-10">
-                        <div className="flex items-center gap-2 mb-2">
-                            <span className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${isDark ? 'bg-indigo-500/20 text-indigo-400' : 'bg-indigo-100 text-indigo-700'}`}>2</span>
-                            <h3 className={`font-bold text-lg ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>Optimize Payments</h3>
-                        </div>
-                        <p className={`text-sm mb-4 pl-8 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Instead of everyone paying everyone else back individually, the algorithm minimizes the total number of transactions required.</p>
-                        
-                        <div className="space-y-3 pl-8">
-                            {steps.length > 0 ? steps.map((step, idx) => (
-                                <div key={idx} className={`p-4 rounded-xl border flex items-center justify-between gap-2 shadow-sm transition-all hover:-translate-y-0.5 ${isDark ? 'bg-slate-900/60 border-slate-700/50 hover:border-slate-600' : 'bg-slate-50 border-slate-200 hover:bg-white hover:shadow-md'}`}>
-                                    
-                                    {/* Debtor */}
-                                    <div className="flex flex-col items-center flex-1 min-w-[80px]">
-                                        <div className="relative">
-                                            <Avatar name={guestMap[step.from]} size="md" />
-                                            <div className="absolute -bottom-1 -right-1 bg-rose-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center border border-slate-900">-</div>
-                                        </div>
-                                        <span className={`text-xs sm:text-sm font-bold mt-2 truncate max-w-full px-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{guestMap[step.from]}</span>
-                                    </div>
-                                    
-                                    {/* Arrow & Amount */}
-                                    <div className="flex flex-col items-center justify-center flex-[2] px-2">
-                                        <span className={`font-black text-lg sm:text-xl mb-1 whitespace-nowrap bg-clip-text text-transparent bg-gradient-to-r ${isDark ? 'from-cyan-400 to-blue-500' : 'from-cyan-600 to-blue-700'}`}>
-                                            ₹{step.amount.toFixed(2)}
-                                        </span>
-                                        <div className="w-full relative flex items-center justify-center">
-                                            {/* Line */}
-                                            <div className={`h-1 w-full rounded-full ${isDark ? 'bg-cyan-500/30' : 'bg-cyan-500/20'}`}></div>
-                                            {/* Moving Arrow Effect */}
-                                            <div className="absolute w-full flex justify-center overflow-hidden">
-                                                <svg className="w-24 h-5 text-cyan-500 animate-[pulse_2s_cubic-bezier(0.4,0,0.6,1)_infinite]" preserveAspectRatio="none" viewBox="0 0 100 10" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                                    <path d="M0 5H95M95 5L85 0M95 5L85 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                                </svg>
-                                            </div>
-                                        </div>
-                                        <span className={`text-[10px] font-semibold uppercase tracking-wider mt-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Pays To</span>
-                                    </div>
-
-                                    {/* Creditor */}
-                                    <div className="flex flex-col items-center flex-1 min-w-[80px]">
-                                        <div className="relative">
-                                            <Avatar name={guestMap[step.to]} size="md" />
-                                            <div className="absolute -bottom-1 -right-1 bg-emerald-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center border border-slate-900">+</div>
-                                        </div>
-                                        <span className={`text-xs sm:text-sm font-bold mt-2 truncate max-w-full px-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{guestMap[step.to]}</span>
-                                    </div>
-                                </div>
-                            )) : (
-                                <div className={`py-4 rounded-xl text-center text-sm font-semibold border ${isDark ? 'bg-slate-800/50 border-emerald-500/20 text-emerald-400' : 'bg-emerald-50 border-emerald-200 text-emerald-600'}`}>
-                                    🎉 Everyone is fully settled up! No transactions needed.
-                                </div>
-                            )}
                         </div>
                     </div>
                 </div>
