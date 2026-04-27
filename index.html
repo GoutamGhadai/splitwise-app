@@ -1040,13 +1040,37 @@
                 if (!activeTrip) return {};
             
                 const summaries = activeTrip.guests.reduce((acc, guest) => {
-                    acc[guest.id] = { paid: 0, share: 0 };
+                    acc[guest.id] = { paid: 0, share: 0, received: 0, paidSettlement: 0 };
                     return acc;
                 }, {});
             
                 activeTrip.expenses.forEach(expense => {
                     const totalAmount = parseFloat(expense.amount);
                     if (isNaN(totalAmount) || totalAmount <= 0) return;
+            
+                    // Separate settlements from standard expenses to fix calculation discrepancies
+                    if (expense.isSettlement) {
+                        const payerId = expense.paidById;
+                        if (payerId && summaries[payerId]) {
+                            summaries[payerId].paidSettlement += totalAmount;
+                        }
+                        
+                        if (expense.splitType === 'amounts' && expense.splitDetails) {
+                            Object.entries(expense.splitDetails).forEach(([guestId, amount]) => {
+                                if (summaries[guestId]) {
+                                    summaries[guestId].received += parseFloat(amount);
+                                }
+                            });
+                        } else if (expense.splitWith && expense.splitWith.length > 0) {
+                            const share = totalAmount / expense.splitWith.length;
+                            expense.splitWith.forEach(guestId => {
+                                if (summaries[guestId]) {
+                                    summaries[guestId].received += share;
+                                }
+                            });
+                        }
+                        return; // Skip normal paid/share calculation for settlements
+                    }
             
                     if (expense.paidBy) {
                         Object.entries(expense.paidBy).forEach(([guestId, amt]) => {
@@ -1489,34 +1513,50 @@
                                     </div>
                                     <ul className="space-y-3">
                                         {activeTrip.guests.length > 0 ? activeTrip.guests.map((guest, index) => {
-                                            const summary = guestSummaries[guest.id] || { paid: 0, share: 0 };
+                                            const summary = guestSummaries[guest.id] || { paid: 0, share: 0, received: 0, paidSettlement: 0 };
                                             // Fallback: If meId is not set, assume the first guest is "You"
                                             const isMe = activeTrip.meId ? activeTrip.meId === guest.id : index === 0;
+                                            const netBalance = (summary.paid + summary.paidSettlement) - (summary.share + summary.received);
+                                            const isDark = theme === 'dark';
                                             
                                             return (
-                                                <li key={guest.id} className="bg-slate-900/40 p-3 rounded-lg interactive-item animate-fadeInUp" style={{animationDelay: `${index * 0.1}s`, opacity: 0}}>
-                                                    <div className="flex justify-between items-center">
+                                                <li key={guest.id} className={`${isDark ? 'bg-slate-900/40' : 'bg-slate-100/50'} p-3 rounded-lg interactive-item animate-fadeInUp`} style={{animationDelay: `${index * 0.1}s`, opacity: 0}}>
+                                                    <div className="flex justify-between items-center mb-2">
                                                         <div className="flex items-center gap-3 min-w-0">
                                                             <Avatar name={guest.name} />
                                                             <div className="flex items-center gap-2 truncate">
-                                                                <span className="font-bold text-lg text-slate-200 truncate">{guest.name}</span>
+                                                                <span className={`font-bold text-lg truncate ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{guest.name}</span>
                                                                 {isMe && (
-                                                                    <span className="text-[10px] bg-cyan-500/20 text-cyan-400 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider border border-cyan-500/30 flex-shrink-0">You</span>
+                                                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider border flex-shrink-0 ${isDark ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30' : 'bg-cyan-100 text-cyan-600 border-cyan-300'}`}>You</span>
                                                                 )}
                                                             </div>
                                                         </div>
                                                         <div className="flex items-center gap-1 flex-shrink-0 ml-2">
-                                                            <button onClick={() => handleOpenEditGuestModal(guest.id)} className="text-slate-400 hover:text-cyan-400 p-1.5 rounded-full hover:bg-cyan-500/20 transition-all active:scale-90">
+                                                            <button onClick={() => handleOpenEditGuestModal(guest.id)} className={`p-1.5 rounded-full transition-all active:scale-90 ${isDark ? 'text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/20' : 'text-slate-500 hover:text-cyan-600 hover:bg-cyan-100'}`}>
                                                                 <EditIcon />
                                                             </button>
-                                                            <button onClick={() => { setActionTargetId(guest.id); setConfirmAction('removeGuest'); }} className="text-slate-400 hover:text-rose-400 p-1.5 rounded-full hover:bg-rose-500/20 transition-all active:scale-90">
+                                                            <button onClick={() => { setActionTargetId(guest.id); setConfirmAction('removeGuest'); }} className={`p-1.5 rounded-full transition-all active:scale-90 ${isDark ? 'text-slate-400 hover:text-rose-400 hover:bg-rose-500/20' : 'text-slate-500 hover:text-rose-600 hover:bg-rose-100'}`}>
                                                                 <TrashIcon />
                                                             </button>
                                                         </div>
                                                     </div>
-                                                    <div className="flex justify-between items-center mt-2 text-sm pl-11">
-                                                        <span className="font-semibold text-emerald-400">Paid: ₹{summary.paid.toFixed(2)}</span>
-                                                        <span className="font-semibold text-amber-400">Share: ₹{summary.share.toFixed(2)}</span>
+                                                    <div className="pl-11 space-y-1">
+                                                        <div className="flex justify-between items-center text-sm">
+                                                            <span className={`font-semibold ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>Paid: ₹{summary.paid.toFixed(2)}</span>
+                                                            <span className={`font-semibold ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>Share: ₹{summary.share.toFixed(2)}</span>
+                                                        </div>
+                                                        {(summary.received > 0 || summary.paidSettlement > 0) && (
+                                                            <div className={`flex justify-between items-center text-xs border-t pt-1 mt-1 ${isDark ? 'border-slate-700/50' : 'border-slate-300'}`}>
+                                                                {summary.paidSettlement > 0 ? <span className={`font-medium ${isDark ? 'text-cyan-400' : 'text-cyan-600'}`}>Settled: ₹{summary.paidSettlement.toFixed(2)}</span> : <span></span>}
+                                                                {summary.received > 0 ? <span className={`font-medium ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`}>Received: ₹{summary.received.toFixed(2)}</span> : <span></span>}
+                                                            </div>
+                                                        )}
+                                                        <div className={`flex justify-between items-center text-xs border-t pt-1 mt-1 ${isDark ? 'border-slate-700/50' : 'border-slate-300'}`}>
+                                                             <span className={`font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Net Balance:</span>
+                                                             <span className={`font-bold ${netBalance > 0 ? (isDark ? 'text-emerald-400' : 'text-emerald-600') : netBalance < 0 ? (isDark ? 'text-rose-400' : 'text-rose-600') : (isDark ? 'text-slate-500' : 'text-slate-400')}`}>
+                                                                {netBalance > 0 ? `+₹${netBalance.toFixed(2)}` : netBalance < 0 ? `-₹${Math.abs(netBalance).toFixed(2)}` : '₹0.00'}
+                                                             </span>
+                                                        </div>
                                                     </div>
                                                 </li>
                                             );
@@ -3133,8 +3173,8 @@
 
                 // 2. "Your" Balance
                 const you = trip.guests.find(g => g.id === trip.meId) || trip.guests[0];
-                const yourSummary = guestSummaries[you.id] || { paid: 0, share: 0 };
-                const yourBalance = yourSummary.paid - yourSummary.share;
+                const yourSummary = guestSummaries[you.id] || { paid: 0, share: 0, received: 0, paidSettlement: 0 };
+                const yourBalance = (yourSummary.paid + yourSummary.paidSettlement) - (yourSummary.share + yourSummary.received);
 
                 // 3. Top Spender
                 let topSpender = { name: 'N/A', amount: 0 };
