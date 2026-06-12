@@ -332,6 +332,15 @@
             return AVATAR_COLORS[charCodeSum % AVATAR_COLORS.length];
         };
 
+        const fmt = (amount, decimals = 2) => {
+            const num = parseFloat(amount);
+            if (isNaN(num)) return (0).toFixed(decimals);
+            return num.toLocaleString('en-IN', {
+                minimumFractionDigits: decimals,
+                maximumFractionDigits: decimals
+            });
+        };
+
         const calculateSettlement = (trip) => {
             if (!trip || trip.guests.length < 2) {
                 return { transactions: [] };
@@ -901,7 +910,7 @@
                 transactions.forEach(t => {
                     const fromName = tripGuestMap[t.from];
                     const toName = tripGuestMap[t.to];
-                    const amount = t.amount.toFixed(2);
+                    const amount = fmt(t.amount, 2);
                     summaryText += `- ${fromName} owes ${toName}: ₹${amount}\n`;
                 });
 
@@ -1069,7 +1078,7 @@
                         splitDetails: { [t.to]: t.amount },
                         isSettlement: true
                     };
-                    const message = `Recorded payment of ₹${t.amount.toFixed(2)} from ${fromName} to ${toName}.`;
+                    const message = `Recorded payment of ₹${fmt(t.amount, 2)} from ${fromName} to ${toName}.`;
                     modifyActiveTrip(trip => ({ ...trip, expenses: [...trip.expenses, newExpense], paidSettlements: {} }), message);
                 }
                 setConfirmAction(null);
@@ -1387,7 +1396,7 @@
                 const fromName = activeTrip?.guests.find(g => g.id === from)?.name;
                 const toName = activeTrip?.guests.find(g => g.id === to)?.name;
                 modalTitle = "Log Payment?";
-                modalBody = <p>Record a payment of <strong>₹{amount.toFixed(2)}</strong> from <strong>{fromName}</strong> to <strong>{toName}</strong>?</p>;
+                modalBody = <p>Record a payment of <strong>₹{fmt(amount, 2)}</strong> from <strong>{fromName}</strong> to <strong>{toName}</strong>?</p>;
                 modalConfirmText = "Log Payment";
                 isDestructive = false;
             }
@@ -1477,7 +1486,7 @@
                                                     <WalletIcon />
                                                 </div>
                                                 <span className={`text-[11px] uppercase tracking-widest font-bold mb-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Your Lifetime Spend</span>
-                                                <span className={`text-3xl md:text-4xl font-black ${theme === 'dark' ? 'text-white' : 'text-slate-800'}`}>₹{globalStats.lifetimeSpend.toFixed(0)}</span>
+                                                <span className={`text-3xl md:text-4xl font-black ${theme === 'dark' ? 'text-white' : 'text-slate-800'}`}>₹{fmt(globalStats.lifetimeSpend, 0)}</span>
                                             </div>
                                             
                                             {/* Owed to you */}
@@ -1486,7 +1495,7 @@
                                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941" /></svg>
                                                 </div>
                                                 <span className={`text-[11px] uppercase tracking-widest font-bold mb-1 ${theme === 'dark' ? 'text-emerald-400/80' : 'text-emerald-600/80'}`}>Total Owed to You</span>
-                                                <span className={`text-3xl md:text-4xl font-black ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-500'}`}>₹{globalStats.totalOwedToMe.toFixed(0)}</span>
+                                                <span className={`text-3xl md:text-4xl font-black ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-500'}`}>₹{fmt(globalStats.totalOwedToMe, 0)}</span>
                                             </div>
                                             
                                             {/* You Owe */}
@@ -1495,7 +1504,7 @@
                                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6L9 12.75l4.286-4.286a11.948 11.948 0 014.306 6.43l.776 2.898m0 0l3.182-5.511m-3.182 5.51l-5.511-3.181" /></svg>
                                                 </div>
                                                 <span className={`text-[11px] uppercase tracking-widest font-bold mb-1 ${theme === 'dark' ? 'text-rose-400/80' : 'text-rose-600/80'}`}>Total You Owe</span>
-                                                <span className={`text-3xl md:text-4xl font-black ${theme === 'dark' ? 'text-rose-400' : 'text-rose-500'}`}>₹{globalStats.totalIOwe.toFixed(0)}</span>
+                                                <span className={`text-3xl md:text-4xl font-black ${theme === 'dark' ? 'text-rose-400' : 'text-rose-500'}`}>₹{fmt(globalStats.totalIOwe, 0)}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -1566,7 +1575,7 @@
                                                                     <p className={`text-[9px] uppercase tracking-wider font-bold mb-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Total Cost</p>
                                                                     <div className="flex items-center gap-1.5">
                                                                         <Sparkline expenses={trip.expenses} theme={theme} />
-                                                                        <p className={`text-base sm:text-lg font-black tracking-tight ${isDark ? 'text-cyan-400' : 'text-cyan-600'}`}>₹{trip.totalSpend.toFixed(0)}</p>
+                                                                        <p className={`text-base sm:text-lg font-black tracking-tight ${isDark ? 'text-cyan-400' : 'text-cyan-600'}`}>₹{fmt(trip.totalSpend, 0)}</p>
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -1597,7 +1606,7 @@
                                                             <div className="mt-auto pt-2">
                                                                 <div className="flex justify-between items-end mb-1.5">
                                                                     <span className={`text-xs font-bold ${progressData.isSettled ? (isDark ? 'text-emerald-400' : 'text-emerald-600') : (isDark ? 'text-slate-300' : 'text-slate-700')}`}>
-                                                                        {progressData.isSettled ? 'All Settled Up! 🎉' : `₹${progressData.remaining.toFixed(0)} remaining`}
+                                                                        {progressData.isSettled ? 'All Settled Up! 🎉' : `₹${fmt(progressData.remaining, 0)} remaining`}
                                                                     </span>
                                                                     <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded border ${isDark ? 'text-slate-400 bg-black/30 border-white/5' : 'text-slate-600 bg-black/5 border-black/5'}`}>{Math.round(progressData.progress)}% Settled</span>
                                                                 </div>
@@ -1632,7 +1641,7 @@
                                                                                 <span className="opacity-70 text-[11px] mx-1">owes</span>
                                                                                 <span className={`font-bold ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>{trip.tripGuestMap[t.to]}</span>
                                                                             </span>
-                                                                            <span className={`font-bold shrink-0 ${isDark ? 'text-white' : 'text-slate-800'}`}>₹{t.amount.toFixed(2)}</span>
+                                                                            <span className={`font-bold shrink-0 ${isDark ? 'text-white' : 'text-slate-800'}`}>₹{fmt(t.amount, 2)}</span>
                                                                         </div>
                                                                     ))}
                                                                 </div>
@@ -1834,19 +1843,19 @@
                                                     </div>
                                                     <div className="pl-11 space-y-1 pointer-events-none">
                                                         <div className="flex justify-between items-center text-sm">
-                                                            <span className={`font-semibold ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>Paid: ₹{summary.paid.toFixed(2)}</span>
-                                                            <span className={`font-semibold ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>Share: ₹{summary.share.toFixed(2)}</span>
+                                                            <span className={`font-semibold ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>Paid: ₹{fmt(summary.paid, 2)}</span>
+                                                            <span className={`font-semibold ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>Share: ₹{fmt(summary.share, 2)}</span>
                                                         </div>
                                                         {(summary.received > 0 || summary.paidSettlement > 0) && (
                                                             <div className={`flex justify-between items-center text-xs border-t pt-1 mt-1 ${isDark ? 'border-slate-700/50' : 'border-slate-300'}`}>
-                                                                {summary.paidSettlement > 0 ? <span className={`font-medium ${isDark ? 'text-cyan-400' : 'text-cyan-600'}`}>Settled: ₹{summary.paidSettlement.toFixed(2)}</span> : <span></span>}
-                                                                {summary.received > 0 ? <span className={`font-medium ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`}>Received: ₹{summary.received.toFixed(2)}</span> : <span></span>}
+                                                                {summary.paidSettlement > 0 ? <span className={`font-medium ${isDark ? 'text-cyan-400' : 'text-cyan-600'}`}>Settled: ₹{fmt(summary.paidSettlement, 2)}</span> : <span></span>}
+                                                                {summary.received > 0 ? <span className={`font-medium ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`}>Received: ₹{fmt(summary.received, 2)}</span> : <span></span>}
                                                             </div>
                                                         )}
                                                         <div className={`flex justify-between items-center text-xs border-t pt-1 mt-1 ${isDark ? 'border-slate-700/50' : 'border-slate-300'}`}>
                                                              <span className={`font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Net Balance:</span>
                                                              <span className={`font-bold ${netBalance > 0 ? (isDark ? 'text-emerald-400' : 'text-emerald-600') : netBalance < 0 ? (isDark ? 'text-rose-400' : 'text-rose-600') : (isDark ? 'text-slate-500' : 'text-slate-400')}`}>
-                                                                {netBalance > 0 ? `+₹${netBalance.toFixed(2)}` : netBalance < 0 ? `-₹${Math.abs(netBalance).toFixed(2)}` : '₹0.00'}
+                                                                {netBalance > 0 ? `+₹${fmt(netBalance, 2)}` : netBalance < 0 ? `-₹${fmt(Math.abs(netBalance), 2)}` : '₹0.00'}
                                                              </span>
                                                         </div>
                                                     </div>
@@ -1965,7 +1974,7 @@
                                                     )}
                                                 </div>
                                                 <div className="text-right flex-shrink-0 ml-4">
-                                                    <p className="text-xl font-bold text-emerald-400">₹{parseFloat(expense.amount).toFixed(2)}</p>
+                                                    <p className="text-xl font-bold text-emerald-400">₹{fmt(expense.amount, 2)}</p>
                                                      <div className="flex items-center justify-end gap-2 mt-1">
                                                         {!isSettlement && (
                                                             <button onClick={(e) => { e.stopPropagation(); handleOpenEditExpenseModal(expense.id); }} className="text-slate-400 hover:text-cyan-400 p-1 rounded-full hover:bg-cyan-500/20 transition-all active:scale-90">
@@ -2019,7 +2028,7 @@
                                                             <Avatar name={guestMap[t.to]} size="sm" />
                                                         </div>
                                                         <div className="flex items-center gap-3">
-                                                            <span className={`font-bold text-lg sm:text-xl text-white whitespace-nowrap`}>₹{t.amount.toFixed(2)}</span>
+                                                            <span className={`font-bold text-lg sm:text-xl text-white whitespace-nowrap`}>₹{fmt(t.amount, 2)}</span>
                                                             <button className="hidden sm:block bg-emerald-500/20 text-emerald-400 hover:bg-emerald-50 hover:text-white transition-all text-xs font-bold py-1.5 px-3 rounded-md">Log Payment</button>
                                                         </div>
                                                     </li>
@@ -2662,7 +2671,7 @@
                                         else if (context.parsed.r !== null && context.parsed.r !== undefined) value = context.parsed.r;
                                         else if (context.parsed !== null && context.parsed !== undefined) value = context.parsed;
 
-                                        label += (value < 0 ? '-' : '') + '₹' + Math.abs(value).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                                        label += (value < 0 ? '-' : '') + '₹' + fmt(Math.abs(value), 2);
                                         
                                         // Add Percentage Breakdown for Doughnut Chart
                                         if (chartType === 'Doughnut') {
@@ -2734,7 +2743,7 @@
                                 ctx.textBaseline = "middle";
                                 ctx.fillStyle = theme === 'dark' ? '#f8fafc' : '#0f172a';
                                 
-                                const text = "₹" + total.toLocaleString('en-IN', {maximumFractionDigits: 0});
+                                const text = "₹" + fmt(total, 0);
                                 const textX = Math.round((width - ctx.measureText(text).width) / 2);
                                 const textY = height / 2;
                                 ctx.fillText(text, textX, textY);
@@ -2917,7 +2926,7 @@
                                     <div className={`p-4 rounded-xl border ${theme === 'dark' ? 'bg-slate-800/60 border-slate-700/50' : 'bg-white border-slate-200'} shadow-sm flex flex-col justify-center`}>
                                         <p className={`text-[10px] sm:text-xs font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Total Spend Vol.</p>
                                         <div className="flex flex-col sm:flex-row sm:items-end gap-1 sm:gap-2 mt-1">
-                                            <p className={`text-lg sm:text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-800'}`}>₹{kpis.totalSpend.toFixed(2)}</p>
+                                            <p className={`text-lg sm:text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-800'}`}>₹{fmt(kpis.totalSpend, 2)}</p>
                                             {kpis.trend && (
                                                 <span className={`text-xs font-semibold mb-1 ${kpis.trend.isPositive ? 'text-rose-400' : 'text-emerald-500'}`}>
                                                     {kpis.trend.isPositive ? '↑' : '↓'} {kpis.trend.text}
@@ -2928,21 +2937,21 @@
                                     <div className={`p-4 rounded-xl border ${theme === 'dark' ? 'bg-slate-800/60 border-slate-700/50' : 'bg-white border-slate-200'} shadow-sm flex flex-col justify-center`}>
                                         <p className={`text-[10px] sm:text-xs font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Avg. Daily Spend</p>
                                         <p className={`text-base sm:text-lg font-bold mt-1 truncate ${theme === 'dark' ? 'text-white' : 'text-slate-800'}`}>
-                                            ₹{kpis.dailyAvg.toFixed(0)} <span className={`text-xs sm:text-sm font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>/day</span>
+                                            ₹{fmt(kpis.dailyAvg, 0)} <span className={`text-xs sm:text-sm font-medium ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>/day</span>
                                         </p>
                                     </div>
                                     <div className={`p-4 rounded-xl border ${theme === 'dark' ? 'bg-slate-800/60 border-slate-700/50' : 'bg-white border-slate-200'} shadow-sm flex flex-col justify-center`}>
                                         <p className={`text-[10px] sm:text-xs font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Top Category</p>
                                         <p className={`text-base sm:text-lg font-bold mt-1 truncate ${theme === 'dark' ? 'text-white' : 'text-slate-800'}`}>
                                             {kpis.topCat[0]} 
-                                            <span className={`text-xs sm:text-sm font-medium ml-1.5 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>₹{kpis.topCat[1].toFixed(0)}</span>
+                                            <span className={`text-xs sm:text-sm font-medium ml-1.5 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>₹{fmt(kpis.topCat[1], 0)}</span>
                                         </p>
                                     </div>
                                     <div className={`p-4 rounded-xl border ${theme === 'dark' ? 'bg-slate-800/60 border-slate-700/50' : 'bg-white border-slate-200'} shadow-sm flex flex-col justify-center`}>
                                         <p className={`text-[10px] sm:text-xs font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Top Payer</p>
                                         <p className={`text-base sm:text-lg font-bold mt-1 truncate ${theme === 'dark' ? 'text-white' : 'text-slate-800'}`}>
                                             {kpis.topPayer[0]} 
-                                            <span className={`text-xs sm:text-sm font-medium ml-1.5 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>₹{kpis.topPayer[1].toFixed(0)}</span>
+                                            <span className={`text-xs sm:text-sm font-medium ml-1.5 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>₹{fmt(kpis.topPayer[1], 0)}</span>
                                         </p>
                                     </div>
                                 </div>
@@ -2994,15 +3003,15 @@
                                             {chartData.data.map((row, i) => (
                                                 <tr key={row.name || i} className={`transition-colors ${theme === 'dark' ? 'hover:bg-slate-800/50' : 'hover:bg-slate-50'}`}>
                                                     <td className={`px-4 py-3 font-medium ${theme === 'dark' ? 'text-white' : 'text-slate-800'}`}>{row.name}</td>
-                                                    {groupBy !== 'person' && <td className={`px-4 py-3 font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-800'}`}>₹{row.Total?.toFixed(2)}</td>}
+                                                    {groupBy !== 'person' && <td className={`px-4 py-3 font-semibold ${theme === 'dark' ? 'text-white' : 'text-slate-800'}`}>₹{fmt(row.Total, 2)}</td>}
                                                     {groupBy === 'person' ? (
                                                         <td className={`px-4 py-3 font-bold ${metric === 'net' ? (row.value > 0 ? 'text-emerald-500' : row.value < 0 ? 'text-rose-500' : 'text-slate-400') : (theme === 'dark' ? 'text-white' : 'text-slate-800')}`}>
-                                                            {metric === 'net' && row.value > 0 ? '+' : ''}₹{row.value?.toFixed(2)}
+                                                            {metric === 'net' ? (row.value > 0 ? '+₹' : row.value < 0 ? '-₹' : '₹') : '₹'}{fmt(Math.abs(row.value || 0), 2)}
                                                         </td>
                                                     ) : (
                                                         chartData.seriesKeys.map(key => (
                                                             <td key={key} className={`px-4 py-3 ${metric === 'net' ? (row[key] > 0 ? 'text-emerald-500 font-semibold' : row[key] < 0 ? 'text-rose-500 font-semibold' : (theme==='dark'?'text-slate-400':'text-slate-500')) : (theme==='dark'?'text-slate-300':'text-slate-700')}`}>
-                                                                {metric === 'net' && row[key] > 0 ? '+' : ''}₹{(row[key] || 0).toFixed(2)}
+                                                                {metric === 'net' ? (row[key] > 0 ? '+₹' : row[key] < 0 ? '-₹' : '₹') : '₹'}{fmt(Math.abs(row[key] || 0), 2)}
                                                             </td>
                                                         ))
                                                     )}
@@ -3517,7 +3526,7 @@
                                     />
                                     <div className="flex-grow pointer-events-none">
                                         <p className="font-semibold text-slate-200">{expense.description}</p>
-                                        <p className="text-sm text-slate-400">₹{expense.amount.toFixed(2)} on {new Date(expense.date).toLocaleDateString()}</p>
+                                        <p className="text-sm text-slate-400">₹{fmt(expense.amount, 2)} on {new Date(expense.date).toLocaleDateString()}</p>
                                     </div>
                                 </div>
                             ))}
@@ -3571,8 +3580,8 @@
 
             const balanceColor = dashboardStats.yourBalance >= 0 ? 'text-emerald-400' : 'text-rose-400';
             const balanceText = dashboardStats.yourBalance >= 0 
-                ? `You are owed ₹${dashboardStats.yourBalance.toFixed(2)}` 
-                : `You owe ₹${(-dashboardStats.yourBalance).toFixed(2)}`;
+                ? `You are owed ₹${fmt(dashboardStats.yourBalance, 2)}` 
+                : `You owe ₹${fmt(Math.abs(dashboardStats.yourBalance), 2)}`;
 
             const budget = trip?.budget || 0;
             const budgetPct = budget > 0 ? Math.min((dashboardStats.totalCost / budget) * 100, 100) : 0;
@@ -3586,8 +3595,8 @@
                         {/* Total Cost & Budget Gauge */}
                         <div className="glass-card carbon-card p-5 rounded-2xl flex items-center justify-between gap-4 group overflow-hidden relative">
                             <div className="relative z-10 w-full min-w-0">
-                                <p className="text-sm text-slate-400 font-medium truncate">Total Cost {budget > 0 && <span className="opacity-70 text-xs">(of ₹{budget.toLocaleString()})</span>}</p>
-                                <p className="text-2xl font-bold text-white group-hover:text-cyan-200 transition-colors">₹{dashboardStats.totalCost.toFixed(2)}</p>
+                                <p className="text-sm text-slate-400 font-medium truncate">Total Cost {budget > 0 && <span className="opacity-70 text-xs">(of ₹{fmt(budget, 0)})</span>}</p>
+                                <p className="text-2xl font-bold text-white group-hover:text-cyan-200 transition-colors">₹{fmt(dashboardStats.totalCost, 2)}</p>
                             </div>
                             
                             {budget > 0 ? (
@@ -3743,7 +3752,7 @@
                                             >
                                             </div>
                                             <div className={`absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 group-hover:-translate-y-1 transition-all duration-300 backdrop-blur-sm text-xs font-bold py-1 px-2 rounded-md whitespace-nowrap shadow-lg z-50 ${theme === 'dark' ? 'bg-slate-900/90 text-white' : 'bg-white border border-slate-200 text-slate-800'}`}>
-                                                ₹{item.amount.toFixed(2)}
+                                                ₹{fmt(item.amount, 2)}
                                             </div>
                                         </div>
                                     ))}
@@ -3950,7 +3959,7 @@
                                 <span className="block w-3 h-3 rounded-full shadow-sm" style={{ backgroundColor: CATEGORY_COLORS[item.name] }}></span>
                                 <span className="font-semibold text-slate-300">{item.name}</span>
                             </div>
-                            <span className="font-bold text-slate-200">₹{item.amount.toFixed(2)}</span>
+                            <span className="font-bold text-slate-200">₹{fmt(item.amount, 2)}</span>
                         </li>
                     ))}
                 </ul>
@@ -4271,7 +4280,7 @@
                 if (payerMode === 'multiple') {
                     const multipleTotal = Object.values(paidByMultiple).reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
                     if (Math.abs(multipleTotal - numAmount) > 0.01) {
-                        setError(`The sum of amounts paid (₹${multipleTotal.toFixed(2)}) must equal the total expense (₹${numAmount.toFixed(2)}).`);
+                        setError(`The sum of amounts paid (₹${fmt(multipleTotal, 2)}) must equal the total expense (₹${fmt(numAmount, 2)}).`);
                         return;
                     }
                     finalPaidBy = Object.entries(paidByMultiple).reduce((acc, [id, val]) => {
@@ -4296,7 +4305,7 @@
 
                 if (splitType === 'amounts') {
                     if (Math.abs(unevenSplitTotal - numAmount) > 0.01) {
-                        setError(`The sum of amounts (₹${unevenSplitTotal.toFixed(2)}) must equal the total expense (₹${numAmount.toFixed(2)}).`);
+                        setError(`The sum of amounts (₹${fmt(unevenSplitTotal, 2)}) must equal the total expense (₹${fmt(numAmount, 2)}).`);
                         return;
                     }
                     finalSplitDetails = Object.entries(splitDetails).reduce((acc, [guestId, value]) => {
@@ -4407,7 +4416,7 @@
                                    {splitType === 'itemized' ? (
                                        <div className={`w-full p-2 border rounded-md text-cyan-400 font-bold transition-all cursor-not-allowed flex items-center justify-between ${isDark ? 'bg-slate-800/80 border-slate-600' : 'bg-slate-100 border-slate-300 shadow-inner'}`}>
                                            <span>Auto-calculated:</span>
-                                           <span>₹{computeItemizedTotal().toFixed(2)}</span>
+                                           <span>₹{fmt(computeItemizedTotal(), 2)}</span>
                                        </div>
                                    ) : (
                                        <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" className="w-full p-2 bg-slate-700/50 border border-slate-600 rounded-md text-white transition-all focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500" min="0.01" step="0.01" />
@@ -4467,11 +4476,11 @@
                                                 <div className="flex justify-end items-center mt-2 pr-2 gap-3">
                                                     {Math.abs(multipleRemainder) > 0.01 && splitType !== 'itemized' && (
                                                         <span className={`text-sm font-semibold ${multipleRemainder < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
-                                                            {multipleRemainder < 0 ? `₹${Math.abs(multipleRemainder).toFixed(2)} over total` : `₹${multipleRemainder.toFixed(2)} left to assign`}
+                                                            {multipleRemainder < 0 ? `₹${fmt(Math.abs(multipleRemainder), 2)} over total` : `₹${fmt(multipleRemainder, 2)} left to assign`}
                                                         </span>
                                                     )}
                                                     <div className="text-sm font-bold text-slate-300">
-                                                        Total Paid: ₹{multiplePaidTotal.toFixed(2)}
+                                                        Total Paid: ₹{fmt(multiplePaidTotal, 2)}
                                                     </div>
                                                 </div>
                                             );
@@ -4615,7 +4624,7 @@
                                             </span>
                                         )}
                                         <div className="text-sm font-bold text-slate-300">
-                                            Total: {unevenSplitTotal.toFixed(2)}{splitType === 'percentages' ? '%' : ''}
+                                            Total: {fmt(unevenSplitTotal, 2)}{splitType === 'percentages' ? '%' : ''}
                                         </div>
                                     </div>
                                 )}
@@ -4701,19 +4710,19 @@
                                             {expense.paidBy ? (
                                                 Object.entries(expense.paidBy).map(([id, amt]) => (
                                                     <span key={id} className={`px-2 py-0.5 rounded-md text-xs font-medium ${isDark ? 'bg-slate-700/50 text-slate-300' : 'bg-slate-100 text-slate-700'}`}>
-                                                        {guestMap[id]}: ₹{parseFloat(amt).toFixed(2)}
+                                                        {guestMap[id]}: ₹{fmt(amt, 2)}
                                                     </span>
                                                 ))
                                             ) : (
                                                 <span className={`px-2 py-0.5 rounded-md text-xs font-medium ${isDark ? 'bg-slate-700/50 text-slate-300' : 'bg-slate-100 text-slate-700'}`}>
-                                                    {guestMap[expense.paidById]}: ₹{totalAmount.toFixed(2)}
+                                                    {guestMap[expense.paidById]}: ₹{fmt(totalAmount, 2)}
                                                 </span>
                                             )}
                                         </div>
                                     </div>
                                 </div>
                                 <div className="text-right shrink-0 ml-2">
-                                    <p className={`text-xl font-bold ${isDark ? 'text-cyan-400' : 'text-cyan-600'}`}>₹{totalAmount.toFixed(2)}</p>
+                                    <p className={`text-xl font-bold ${isDark ? 'text-cyan-400' : 'text-cyan-600'}`}>₹{fmt(totalAmount, 2)}</p>
                                     <p className={`text-xs uppercase font-semibold mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{expense.category}</p>
                                 </div>
                             </div>
@@ -4737,8 +4746,8 @@
                                                 <span className={`font-bold truncate text-sm sm:text-base ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{share.name}</span>
                                             </div>
                                             <div className="text-right shrink-0 ml-2">
-                                                <p className={`font-bold ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>₹{share.amount.toFixed(2)}</p>
-                                                <p className={`text-xs font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{share.percentage.toFixed(1)}%</p>
+                                                <p className={`font-bold ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>₹{fmt(share.amount, 2)}</p>
+                                                <p className={`text-xs font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{fmt(share.percentage, 1)}%</p>
                                             </div>
                                         </div>
                                     </div>
@@ -4882,16 +4891,16 @@
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6 shrink-0">
                             <div className={`p-4 rounded-lg border shadow-inner ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
                                 <p className={`text-xs uppercase font-bold tracking-wider mb-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Total Paid</p>
-                                <p className={`text-xl font-extrabold ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>₹{(summary.paid + summary.paidSettlement).toFixed(2)}</p>
+                                <p className={`text-xl font-extrabold ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>₹{fmt(summary.paid + summary.paidSettlement, 2)}</p>
                             </div>
                             <div className={`p-4 rounded-lg border shadow-inner ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
                                 <p className={`text-xs uppercase font-bold tracking-wider mb-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Total Share</p>
-                                <p className={`text-xl font-extrabold ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>₹{(summary.share + summary.received).toFixed(2)}</p>
+                                <p className={`text-xl font-extrabold ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>₹{fmt(summary.share + summary.received, 2)}</p>
                             </div>
                             <div className={`p-4 rounded-lg border col-span-2 md:col-span-2 flex flex-col justify-center ${isDark ? 'bg-slate-800/80 border-slate-600' : 'bg-white border-slate-300 shadow-sm'}`}>
                                 <p className={`text-xs uppercase font-bold tracking-wider mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Net Balance</p>
                                 <p className={`text-2xl font-extrabold ${netBalance > 0 ? (isDark ? 'text-emerald-400' : 'text-emerald-600') : netBalance < 0 ? (isDark ? 'text-rose-400' : 'text-rose-600') : (isDark ? 'text-slate-300' : 'text-slate-700')}`}>
-                                    {netBalance > 0 ? `+₹${netBalance.toFixed(2)} (Owed to them)` : netBalance < 0 ? `-₹${Math.abs(netBalance).toFixed(2)} (They owe)` : '₹0.00 (Settled)'}
+                                    {netBalance > 0 ? `+₹${fmt(netBalance, 2)} (Owed to them)` : netBalance < 0 ? `-₹${fmt(Math.abs(netBalance), 2)} (They owe)` : '₹0.00 (Settled)'}
                                 </p>
                             </div>
                         </div>
@@ -4916,16 +4925,16 @@
                                             <div className="flex items-center gap-4 sm:gap-6 shrink-0 justify-between sm:justify-end border-t sm:border-t-0 pt-3 sm:pt-0 mt-2 sm:mt-0 border-slate-700/30">
                                                 <div className="text-left sm:text-right">
                                                     <p className={`text-xs font-semibold mb-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{expense.isSettlement ? 'Settled' : 'Paid'}</p>
-                                                    <p className={`text-base font-bold ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>₹{(paid + paidSettlement).toFixed(2)}</p>
+                                                    <p className={`text-base font-bold ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>₹{fmt(paid + paidSettlement, 2)}</p>
                                                 </div>
                                                 <div className="text-left sm:text-right">
                                                     <p className={`text-xs font-semibold mb-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{expense.isSettlement ? 'Received' : 'Share'}</p>
-                                                    <p className={`text-base font-bold ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>₹{(share + received).toFixed(2)}</p>
+                                                    <p className={`text-base font-bold ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>₹{fmt(share + received, 2)}</p>
                                                 </div>
                                                 <div className={`text-right w-24 px-3 py-1.5 rounded-lg ${isDark ? 'bg-black/20' : 'bg-slate-100'} shadow-inner`}>
                                                     <p className={`text-xs font-semibold mb-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Net</p>
                                                     <p className={`text-sm font-bold ${netForExpense > 0 ? (isDark ? 'text-emerald-400' : 'text-emerald-600') : netForExpense < 0 ? (isDark ? 'text-rose-400' : 'text-rose-600') : (isDark ? 'text-slate-400' : 'text-slate-500')}`}>
-                                                        {netForExpense > 0 ? '+' : ''}{netForExpense.toFixed(2)}
+                                                        {netForExpense > 0 ? '+' : ''}{fmt(netForExpense, 2)}
                                                     </p>
                                                 </div>
                                             </div>
