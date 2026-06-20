@@ -18,8 +18,11 @@
     <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
 
-    <!-- Babel Standalone -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Three.js for 3D Background -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <!-- Babel Standalone (Pinned to a stable version) -->
+    <script src="https://unpkg.com/@babel/standalone@7.23.6/babel.min.js"></script>
 
     <style>
         body {
@@ -297,7 +300,10 @@
     <div id="bg-gradient"></div>
     <div id="root"></div>
 
-    <script type="text/babel">
+    <script type="text/babel" data-presets="react,env">
+        /** @jsx React.createElement */
+        /** @jsxFrag React.Fragment */
+        
         // --- React Application Code ---
         const { useState, useEffect, useMemo } = React;
 
@@ -692,6 +698,149 @@
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
             </svg>
         );
+
+        // --- 3D Background Component ---
+        function ThreeBackground({ theme, isActiveTrip }) {
+            const mountRef = React.useRef(null);
+            const mouseRef = React.useRef({ x: 0, y: 0 });
+
+            React.useEffect(() => {
+                const handleMouseMove = (e) => {
+                    mouseRef.current = {
+                        x: (e.clientX / window.innerWidth) * 2 - 1,
+                        y: -(e.clientY / window.innerHeight) * 2 + 1
+                    };
+                };
+                window.addEventListener('mousemove', handleMouseMove);
+                return () => window.removeEventListener('mousemove', handleMouseMove);
+            }, []);
+
+            React.useEffect(() => {
+                if (!window.THREE || !mountRef.current) return;
+
+                const scene = new THREE.Scene();
+                // Match the theme background smoothly
+                scene.fog = new THREE.FogExp2(theme === 'dark' ? 0x020617 : 0xfdfbf7, 0.035);
+
+                const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+                
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                mountRef.current.innerHTML = '';
+                mountRef.current.appendChild(renderer.domElement);
+
+                // Lighting setup for premium fintech feel
+                const ambientLight = new THREE.AmbientLight(0xffffff, theme === 'dark' ? 0.6 : 0.8);
+                scene.add(ambientLight);
+
+                const dirLight = new THREE.DirectionalLight(theme === 'dark' ? 0x38bdf8 : 0x0ea5e9, 1.2);
+                dirLight.position.set(10, 20, 10);
+                scene.add(dirLight);
+
+                const dirLight2 = new THREE.DirectionalLight(theme === 'dark' ? 0x818cf8 : 0xf59e0b, 0.8);
+                dirLight2.position.set(-10, -10, -10);
+                scene.add(dirLight2);
+
+                // Create floating shapes (coins/tokens representing expenses)
+                const geometry = new THREE.CylinderGeometry(1.2, 1.2, 0.15, 32);
+                
+                const materials = [
+                    new THREE.MeshStandardMaterial({ color: theme === 'dark' ? 0x0ea5e9 : 0xf59e0b, metalness: 0.8, roughness: 0.2 }),
+                    new THREE.MeshStandardMaterial({ color: theme === 'dark' ? 0x38bdf8 : 0xfbbf24, metalness: 0.9, roughness: 0.1 }),
+                    new THREE.MeshStandardMaterial({ color: theme === 'dark' ? 0x818cf8 : 0x10b981, metalness: 0.7, roughness: 0.3 })
+                ];
+
+                const objects = [];
+                const objCount = 30;
+
+                for (let i = 0; i < objCount; i++) {
+                    const material = materials[Math.floor(Math.random() * materials.length)];
+                    const mesh = new THREE.Mesh(geometry, material);
+                    
+                    // Spread objects widely across the background
+                    mesh.position.x = (Math.random() - 0.5) * 50;
+                    mesh.position.y = (Math.random() - 0.5) * 50;
+                    mesh.position.z = (Math.random() - 0.5) * 30 - 15; 
+                    
+                    mesh.rotation.x = Math.random() * Math.PI;
+                    mesh.rotation.y = Math.random() * Math.PI;
+
+                    mesh.userData = {
+                        rotSpeedX: (Math.random() - 0.5) * 0.015,
+                        rotSpeedY: (Math.random() - 0.5) * 0.015,
+                        floatSpeed: (Math.random() * 0.01) + 0.005,
+                        floatOffset: Math.random() * Math.PI * 2,
+                        baseY: mesh.position.y
+                    };
+
+                    const scale = Math.random() * 0.8 + 0.3;
+                    mesh.scale.set(scale, scale, scale);
+
+                    scene.add(mesh);
+                    objects.push(mesh);
+                }
+
+                camera.position.z = 20;
+
+                let animationFrameId;
+                let time = 0;
+
+                const renderLoop = () => {
+                    time += 1;
+                    
+                    // Interactive Parallax
+                    const targetX = mouseRef.current.x * 6;
+                    const targetY = mouseRef.current.y * 6;
+                    
+                    camera.position.x += (targetX - camera.position.x) * 0.03;
+                    camera.position.y += (targetY - camera.position.y) * 0.03;
+                    camera.lookAt(scene.position);
+
+                    // Float & Rotate Animations
+                    objects.forEach((obj) => {
+                        obj.rotation.x += obj.userData.rotSpeedX;
+                        obj.rotation.y += obj.userData.rotSpeedY;
+                        obj.position.y = obj.userData.baseY + Math.sin(time * obj.userData.floatSpeed + obj.userData.floatOffset) * 1.5;
+                    });
+
+                    renderer.render(scene, camera);
+                    animationFrameId = requestAnimationFrame(renderLoop);
+                };
+
+                renderLoop();
+
+                const handleResize = () => {
+                    camera.aspect = window.innerWidth / window.innerHeight;
+                    camera.updateProjectionMatrix();
+                    renderer.setSize(window.innerWidth, window.innerHeight);
+                };
+                window.addEventListener('resize', handleResize);
+
+                return () => {
+                    window.removeEventListener('resize', handleResize);
+                    cancelAnimationFrame(animationFrameId);
+                    if (mountRef.current && renderer.domElement) {
+                        mountRef.current.removeChild(renderer.domElement);
+                    }
+                    geometry.dispose();
+                    materials.forEach(m => m.dispose());
+                    renderer.dispose();
+                };
+            }, [theme]); // Re-render when theme changes to update lighting/colors
+
+            // Subtly fade out the background when a trip is active to reduce distraction
+            return (
+                <div 
+                    ref={mountRef} 
+                    className="fixed inset-0 z-[-3] pointer-events-none transition-all duration-1000 ease-in-out" 
+                    style={{ 
+                        opacity: isActiveTrip ? 0.15 : (theme === 'dark' ? 0.5 : 0.7),
+                        filter: isActiveTrip ? 'blur(8px)' : 'blur(0px)'
+                    }} 
+                />
+            );
+        }
 
         // --- Main App Component ---
         function App() {
@@ -1405,6 +1554,7 @@
             if (!activeTrip) {
                 return (
                     <div className="min-h-screen w-full font-sans flex flex-col items-center justify-center p-4 relative">
+                        <ThreeBackground theme={theme} isActiveTrip={false} />
                         {/* Define TourStartHint Here directly to avoid scope issues */}
                         {showTourHint && (
                             <div className="fixed top-5 right-5 z-[1000] w-64 transform transition-all duration-500 cubic-bezier(0.34, 1.56, 0.64, 1)">
@@ -1456,19 +1606,19 @@
                                 Select a trip below to manage your balances, or launch a new adventure to start tracking.
                             </p>
                             
-                            {/* Premium Glowing CTA Button */}
+                            {/* Premium Professional CTA Button */}
                             <div className="animate-fadeInUp mb-16 flex justify-center" style={{animationDelay: '0.4s'}}>
-                                <button data-tour="add-trip-button" onClick={() => { setEditingTrip(null); setTripModalOpen(true); }} className="relative group inline-flex items-center justify-center transition-all active:scale-95">
-                                    {/* Animated glowing backdrop */}
-                                    <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-cyan-500 via-indigo-500 to-purple-500 opacity-70 blur-md group-hover:opacity-100 group-hover:blur-lg transition-all duration-500 animate-gradient-xy"></div>
-                                    {/* Button surface */}
-                                    <div className={`relative flex items-center gap-3 h-full w-full rounded-full px-8 py-4 transition-colors ${theme === 'dark' ? 'bg-slate-900 group-hover:bg-slate-800' : 'bg-white group-hover:bg-slate-50'}`}>
-                                        <div className={`p-1.5 rounded-full ${theme === 'dark' ? 'bg-slate-800 text-cyan-400 group-hover:text-cyan-300' : 'bg-cyan-50 text-cyan-600'}`}>
+                                <button data-tour="add-trip-button" onClick={() => { setEditingTrip(null); setTripModalOpen(true); }} className={`group relative inline-flex items-center justify-center px-8 py-4 font-bold text-lg rounded-2xl transition-all duration-300 overflow-hidden shadow-xl active:scale-95 ${theme === 'dark' ? 'bg-slate-800 text-white shadow-cyan-900/20 hover:shadow-cyan-500/30 border border-slate-700 hover:border-cyan-500/50' : 'bg-white text-slate-800 shadow-slate-200/50 hover:shadow-cyan-500/20 border border-slate-200 hover:border-cyan-400'}`}>
+                                    <span className={`absolute inset-0 w-full h-full -mt-1 rounded-lg opacity-30 bg-gradient-to-b transparent via-transparent ${theme === 'dark' ? 'to-black' : 'to-slate-200'}`}></span>
+                                    <div className="relative flex items-center gap-3">
+                                        <div className={`flex items-center justify-center w-10 h-10 rounded-full transition-colors ${theme === 'dark' ? 'bg-cyan-500/20 text-cyan-400 group-hover:bg-cyan-500 group-hover:text-white' : 'bg-cyan-50 text-cyan-600 group-hover:bg-cyan-500 group-hover:text-white'}`}>
                                             <PlusIcon />
                                         </div>
-                                        <span className={`text-lg font-bold tracking-wide ${theme === 'dark' ? 'text-white' : 'text-slate-800'}`}>Start a New Trip</span>
-                                        <svg xmlns="http://www.w3.org/2000/svg" className={`h-6 w-6 ml-1 transform group-hover:translate-x-1.5 transition-transform ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                                        <span className="tracking-wide">Start a New Trip</span>
+                                        <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ml-1 transform group-hover:translate-x-1 transition-transform ${theme === 'dark' ? 'text-slate-400 group-hover:text-cyan-400' : 'text-slate-400 group-hover:text-cyan-600'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
                                     </div>
+                                    {/* Glossy top highlight */}
+                                    <div className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/10 to-transparent pointer-events-none"></div>
                                 </button>
                             </div>
 
@@ -1734,6 +1884,7 @@
 
             return (
                 <div className="min-h-screen font-sans">
+                     <ThreeBackground theme={theme} isActiveTrip={true} />
                      {/* Define TourStartHint Here directly to avoid scope issues */}
                      {showTourHint && (
                         <div className="fixed top-5 right-5 z-[1000] w-64 transform transition-all duration-500 cubic-bezier(0.34, 1.56, 0.64, 1)">
